@@ -13,6 +13,12 @@ Treat `.agents/skills/` as the project plugins. Read and follow them before chan
 
 `skills-lock.json` pins those skill sources. Do not invent APIs the skills forbid (Manifest V2, `.then()` chains, inline scripts, missing icon files, `<all_urls>` unless justified).
 
+## Documentation
+
+- After every behaviour, permission, storage, or workflow change, update the relevant documentation in the same change. Do not finish a task with stale docs.
+- Keep `README.md` and the architecture notes in this file accurate. Add or extend a doc when a new user-facing or integration surface has no home.
+- Content Exchange login for humans is in `README.md`. Laravel endpoints are in `content-exchange-v2/core/docs/Content-Studio-Plugin-Auth.md`.
+
 ## How the extension works
 
 ```
