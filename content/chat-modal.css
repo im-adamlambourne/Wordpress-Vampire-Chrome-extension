@@ -1,6 +1,9 @@
 /* Source of truth for the overlay look. Runtime uses the CHAT_MODAL_CSS
    copy in chat-modal.js — content-script fetch of this file is blocked
-   by the host page. Update both when changing styles. */
+   by the host page. Update both when changing styles.
+
+   Layout, motion, loader, and spinner match the Content Exchange chat
+   modal. Colour is Immediate Media cyan/royal, not CEX plum. */
 
 :host {
   position: fixed;
@@ -19,6 +22,7 @@
 }
 
 .wpv-chat {
+  --ws-panel: #0b61b6;
   --ws-well-4: #022240;
   --ws-well-5: #021d36;
   --ws-hairline: rgba(255, 255, 255, 0.14);
@@ -29,19 +33,15 @@
   --bubble-fill: #374151;
   --text: #f3f4f6;
   --text-muted: rgba(255, 255, 255, 0.55);
+  --focus-ring: #7ee2fc;
 
   color: var(--text);
   font-size: 14px;
   line-height: 1.45;
 }
 
-.wpv-chat__window[hidden],
-.wpv-chat__fab-wrap[hidden] {
-  display: none;
-}
-
 .wpv-chat__window {
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow: hidden;
   width: 21rem;
@@ -52,6 +52,46 @@
   border: 1px solid var(--window-border);
   border-radius: 1rem;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+  opacity: 0;
+  transform: translateY(1rem);
+  transition:
+    display 0.2s ease-in allow-discrete,
+    overlay 0.2s ease-in allow-discrete,
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+.wpv-chat--open .wpv-chat__window {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    display 0.7s ease-out allow-discrete,
+    overlay 0.7s ease-out allow-discrete,
+    opacity 0.7s ease-out,
+    transform 0.7s ease-out;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4rem);
+  }
+}
+
+.wpv-chat__fab-wrap {
+  display: none;
+  opacity: 0;
+  transition:
+    display 0.2s ease allow-discrete,
+    opacity 0.2s ease;
+}
+
+.wpv-chat:not(.wpv-chat--open) .wpv-chat__fab-wrap {
+  display: block;
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .wpv-chat__header,
@@ -91,8 +131,10 @@
   color: #fff;
 }
 
-.wpv-chat__icon-button:focus-visible {
-  outline: 2px solid #7ee2fc;
+.wpv-chat__icon-button:focus-visible,
+.wpv-chat__fab:focus-visible,
+.wpv-chat__send:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -116,23 +158,25 @@
 }
 
 .wpv-chat__row + .wpv-chat__row {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .wpv-chat__row--user {
   flex-direction: row-reverse;
 }
 
-.wpv-chat__avatar {
-  display: inline-flex;
-  flex-shrink: 0;
+.wpv-chat__row--thinking {
   align-items: center;
-  justify-content: center;
+}
+
+.wpv-chat__avatar {
+  display: block;
+  flex-shrink: 0;
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 999px;
-  background: var(--ws-well-4);
-  color: #7ee2fc;
+  object-fit: cover;
+  background: var(--ws-panel);
 }
 
 .wpv-chat__bubble {
@@ -150,6 +194,10 @@
   border-radius: 0.75rem 0 0.75rem 0.75rem;
 }
 
+.wpv-chat__row--user .wpv-chat__bubble p {
+  color: #fff;
+}
+
 .wpv-chat__row--error .wpv-chat__bubble {
   background: #7f1d1d;
 }
@@ -162,6 +210,10 @@
   overflow-wrap: anywhere;
 }
 
+.wpv-chat__bubble--greeting p {
+  line-height: 1.625;
+}
+
 .wpv-chat__bubble .wpv-chat__status {
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
@@ -172,6 +224,57 @@
   color: #fca5a5;
 }
 
+.wpv-chat__line-loader {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+  margin: 15px 0;
+  position: relative;
+  color: #fff;
+  left: 0;
+  box-sizing: border-box;
+  animation: wpv-shadow-rolling 2s linear infinite;
+}
+
+@keyframes wpv-shadow-rolling {
+  0% {
+    box-shadow: 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  12% {
+    box-shadow: 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  25% {
+    box-shadow: 66px 0 white, 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0);
+  }
+
+  36% {
+    box-shadow: 72px 0 rgb(58, 181, 244), 66px 0 white, 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  50% {
+    box-shadow: 78px 0 white, 72px 0 rgb(58, 181, 244), 66px 0 white, 60px 0 rgb(58, 181, 244);
+  }
+
+  62% {
+    box-shadow: 120px 0 rgba(58, 181, 244, 0), 78px 0 white, 72px 0 rgb(58, 181, 244), 66px 0 white;
+  }
+
+  75% {
+    box-shadow: 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 78px 0 white, 72px 0 rgb(58, 181, 244);
+  }
+
+  87% {
+    box-shadow: 120px 0 rgba(58, 181, 244, 0), 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 78px 0 white;
+  }
+
+  100% {
+    box-shadow: 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0);
+  }
+}
+
 .wpv-chat__composer {
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--ws-hairline);
@@ -180,7 +283,7 @@
 .wpv-chat__form {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -220,6 +323,13 @@
   color: rgb(255 255 255 / 0.48);
 }
 
+.wpv-chat__input:focus {
+  background: var(--ws-well-5);
+  border-color: rgb(126 226 252 / 0.75);
+  box-shadow: 0 0 0 3px rgb(58 181 244 / 0.28);
+  outline: none;
+}
+
 .wpv-chat__input:user-invalid {
   border-color: #f87171;
 }
@@ -243,6 +353,9 @@
 }
 
 .wpv-chat__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 6rem;
   padding: 0.5rem 1rem;
   border: 0;
@@ -252,10 +365,31 @@
   font: inherit;
   font-size: 0.875rem;
   font-weight: 600;
+  transition: background-color 0.15s ease;
 }
 
 .wpv-chat__send:hover:not(:disabled) {
   background: var(--brand-700);
+}
+
+.wpv-chat__spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  animation: wpv-spin 1s linear infinite;
+}
+
+.wpv-chat__spinner-track {
+  opacity: 0.25;
+}
+
+.wpv-chat__spinner-head {
+  opacity: 0.75;
+}
+
+@keyframes wpv-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .wpv-chat__fab {
@@ -269,13 +403,42 @@
   color: #fff;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .wpv-chat__fab:hover:not(:disabled) {
   background: var(--brand-700);
 }
 
-.wpv-chat__fab:focus-visible {
-  outline: 2px solid #7ee2fc;
-  outline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .wpv-chat__window,
+  .wpv-chat--open .wpv-chat__window,
+  .wpv-chat__fab-wrap {
+    transform: none;
+    transition-duration: 0.1s;
+  }
+
+  .wpv-chat--open .wpv-chat__window {
+    @starting-style {
+      transform: none;
+    }
+  }
+
+  .wpv-chat__line-loader {
+    animation: none;
+    width: 4.5rem;
+    height: 6px;
+    margin: 0.5rem 0;
+    border-radius: 0;
+    background:
+      radial-gradient(circle closest-side, rgb(58, 181, 244) 90%, transparent) 0 / 33% 100% no-repeat,
+      radial-gradient(circle closest-side, #fff 90%, transparent) 50% / 33% 100% no-repeat,
+      radial-gradient(circle closest-side, rgb(58, 181, 244) 90%, transparent) 100% / 33% 100% no-repeat;
+    box-shadow: none;
+  }
+
+  .wpv-chat__spinner {
+    animation: none;
+    opacity: 0.7;
+  }
 }

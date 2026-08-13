@@ -70,7 +70,7 @@ async function loadCexAuth() {
     });
 
     if (response.status === 401) {
-      await chrome.storage.local.remove('apiToken');
+      await chrome.storage.local.remove(['apiToken', 'apiUserName']);
       logoutBtn.hidden = true;
       setCexStatus('signed-out', 'Session expired. Log in again.');
       return;
@@ -82,6 +82,7 @@ async function loadCexAuth() {
 
     const user = await response.json();
     const name = user.name || user.email || 'Unknown user';
+    await chrome.storage.local.set({ apiUserName: name });
     setCexStatus('signed-in', `Signed in as ${name}`);
     logoutBtn.hidden = false;
   } catch (err) {
@@ -110,7 +111,7 @@ hostForm.addEventListener('submit', async (event) => {
 
   const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
   if (previousHost && previousHost !== host) {
-    await chrome.storage.local.remove('apiToken');
+    await chrome.storage.local.remove(['apiToken', 'apiUserName']);
   }
 
   await chrome.storage.local.set({ apiHost: host });

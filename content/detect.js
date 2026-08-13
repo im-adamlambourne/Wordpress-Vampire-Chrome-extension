@@ -74,11 +74,34 @@ function detectExcerpt() {
   return valueOf('#excerpt');
 }
 
+function detectNamedValue(ids) {
+  for (const id of ids) {
+    const fromId = valueOf(`#${CSS.escape ? CSS.escape(id) : id}`);
+    if (fromId) return fromId;
+    const el = document.querySelector(`[name="${id.replace(/"/g, '\\"')}"]`);
+    if (typeof el?.value === 'string' && el.value.trim()) return el.value.trim();
+  }
+  return '';
+}
+
+function detectSeoSnapshot() {
+  return {
+    seo_title: detectNamedValue(['yoast_wpseo_title', 'rank_math_title']),
+    seo_description: detectNamedValue(['yoast_wpseo_metadesc', 'rank_math_description']),
+    og_title: detectNamedValue(['yoast_wpseo_opengraph-title', 'rank_math_facebook_title']),
+    og_description: detectNamedValue([
+      'yoast_wpseo_opengraph-description',
+      'rank_math_facebook_description',
+    ]),
+  };
+}
+
 function detectArticleSnapshot() {
   return {
     title: detectTitle(),
     content: detectContent(),
     excerpt: detectExcerpt(),
+    ...detectSeoSnapshot(),
     editor_type: detectEditorType() || '',
     post_id: detectPostId(),
     post_type: detectPostType(),

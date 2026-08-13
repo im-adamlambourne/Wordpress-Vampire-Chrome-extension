@@ -46,7 +46,27 @@ async function exchangePluginToken({ host, verifier, state, redirectUri, respons
   }
 
   await chrome.storage.local.set({ apiHost: host, apiToken: payload.token });
+  await storePluginUserName(host, payload.token);
   await chrome.storage.session.remove('pluginPkce');
+}
+
+async function storePluginUserName(host, token) {
+  try {
+    const response = await fetch(`${host}/api/plugin/me`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return;
+    const user = await response.json();
+    const name = user.name || user.email;
+    if (typeof name === 'string' && name.trim() !== '') {
+      await chrome.storage.local.set({ apiUserName: name.trim() });
+    }
+  } catch {
+    // Avatar falls back to "User" until /me succeeds from the popup.
+  }
 }
 
 async function startPluginLogin({ host, verifier, challenge, state }) {
@@ -94,7 +114,7 @@ async function logoutPlugin() {
     }
   }
 
-  await chrome.storage.local.remove('apiToken');
+  await chrome.storage.local.remove(['apiToken', 'apiUserName']);
   return { ok: true };
 }
 

@@ -2,19 +2,36 @@ const HOST_ID = 'wp-vampire-chat';
 const PANEL_ID = 'wpv-chat-panel';
 const INPUT_ID = 'wpv-chat-input';
 const FIELD_ERROR_ID = 'wpv-chat-input-error';
-const GREETING = 'I can help with this article. Ask me to review, rewrite, or apply changes to the current draft.';
+const GREETING = 'I can help with this article. Ask me to review or rewrite the draft, excerpt, SEO, or Open Graph fields.';
 const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
 const SIGNED_IN_PLACEHOLDER = 'Type your message...';
+const DEFAULT_USER_NAME = 'User';
 const MAX_HISTORY = 20;
 const EDITOR_COMMAND_EVENT = 'wpv-editor';
 const EDITOR_RESULT_EVENT = 'wpv-editor-result';
 const SNAPSHOT_TIMEOUT_MS = 4000;
 const APPLY_TIMEOUT_MS = 10000;
+const AUTH_KEYS = ['apiToken', 'apiUserName'];
+const EDIT_KEYS = [
+  'title',
+  'content',
+  'excerpt',
+  'seo_title',
+  'seo_description',
+  'og_title',
+  'og_description',
+];
 
 // Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
 // URLs uses the page origin and is blocked (page CSP / no WAR), so the
 // stylesheet must ship in this file.
-const CHAT_MODAL_CSS = `
+const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses the CHAT_MODAL_CSS
+   copy in chat-modal.js — content-script fetch of this file is blocked
+   by the host page. Update both when changing styles.
+
+   Layout, motion, loader, and spinner match the Content Exchange chat
+   modal. Colour is Immediate Media cyan/royal, not CEX plum. */
+
 :host {
   position: fixed;
   bottom: 1rem;
@@ -32,6 +49,7 @@ const CHAT_MODAL_CSS = `
 }
 
 .wpv-chat {
+  --ws-panel: #0b61b6;
   --ws-well-4: #022240;
   --ws-well-5: #021d36;
   --ws-hairline: rgba(255, 255, 255, 0.14);
@@ -42,19 +60,15 @@ const CHAT_MODAL_CSS = `
   --bubble-fill: #374151;
   --text: #f3f4f6;
   --text-muted: rgba(255, 255, 255, 0.55);
+  --focus-ring: #7ee2fc;
 
   color: var(--text);
   font-size: 14px;
   line-height: 1.45;
 }
 
-.wpv-chat__window[hidden],
-.wpv-chat__fab-wrap[hidden] {
-  display: none;
-}
-
 .wpv-chat__window {
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow: hidden;
   width: 21rem;
@@ -65,6 +79,46 @@ const CHAT_MODAL_CSS = `
   border: 1px solid var(--window-border);
   border-radius: 1rem;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+  opacity: 0;
+  transform: translateY(1rem);
+  transition:
+    display 0.2s ease-in allow-discrete,
+    overlay 0.2s ease-in allow-discrete,
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+.wpv-chat--open .wpv-chat__window {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    display 0.7s ease-out allow-discrete,
+    overlay 0.7s ease-out allow-discrete,
+    opacity 0.7s ease-out,
+    transform 0.7s ease-out;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4rem);
+  }
+}
+
+.wpv-chat__fab-wrap {
+  display: none;
+  opacity: 0;
+  transition:
+    display 0.2s ease allow-discrete,
+    opacity 0.2s ease;
+}
+
+.wpv-chat:not(.wpv-chat--open) .wpv-chat__fab-wrap {
+  display: block;
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .wpv-chat__header,
@@ -104,8 +158,10 @@ const CHAT_MODAL_CSS = `
   color: #fff;
 }
 
-.wpv-chat__icon-button:focus-visible {
-  outline: 2px solid #7ee2fc;
+.wpv-chat__icon-button:focus-visible,
+.wpv-chat__fab:focus-visible,
+.wpv-chat__send:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -129,23 +185,25 @@ const CHAT_MODAL_CSS = `
 }
 
 .wpv-chat__row + .wpv-chat__row {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .wpv-chat__row--user {
   flex-direction: row-reverse;
 }
 
-.wpv-chat__avatar {
-  display: inline-flex;
-  flex-shrink: 0;
+.wpv-chat__row--thinking {
   align-items: center;
-  justify-content: center;
+}
+
+.wpv-chat__avatar {
+  display: block;
+  flex-shrink: 0;
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 999px;
-  background: var(--ws-well-4);
-  color: #7ee2fc;
+  object-fit: cover;
+  background: var(--ws-panel);
 }
 
 .wpv-chat__bubble {
@@ -163,6 +221,10 @@ const CHAT_MODAL_CSS = `
   border-radius: 0.75rem 0 0.75rem 0.75rem;
 }
 
+.wpv-chat__row--user .wpv-chat__bubble p {
+  color: #fff;
+}
+
 .wpv-chat__row--error .wpv-chat__bubble {
   background: #7f1d1d;
 }
@@ -175,6 +237,10 @@ const CHAT_MODAL_CSS = `
   overflow-wrap: anywhere;
 }
 
+.wpv-chat__bubble--greeting p {
+  line-height: 1.625;
+}
+
 .wpv-chat__bubble .wpv-chat__status {
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
@@ -185,6 +251,57 @@ const CHAT_MODAL_CSS = `
   color: #fca5a5;
 }
 
+.wpv-chat__line-loader {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+  margin: 15px 0;
+  position: relative;
+  color: #fff;
+  left: 0;
+  box-sizing: border-box;
+  animation: wpv-shadow-rolling 2s linear infinite;
+}
+
+@keyframes wpv-shadow-rolling {
+  0% {
+    box-shadow: 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  12% {
+    box-shadow: 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  25% {
+    box-shadow: 66px 0 white, 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0), 0 0 rgba(58, 181, 244, 0);
+  }
+
+  36% {
+    box-shadow: 72px 0 rgb(58, 181, 244), 66px 0 white, 60px 0 rgb(58, 181, 244), 0 0 rgba(255, 255, 255, 0);
+  }
+
+  50% {
+    box-shadow: 78px 0 white, 72px 0 rgb(58, 181, 244), 66px 0 white, 60px 0 rgb(58, 181, 244);
+  }
+
+  62% {
+    box-shadow: 120px 0 rgba(58, 181, 244, 0), 78px 0 white, 72px 0 rgb(58, 181, 244), 66px 0 white;
+  }
+
+  75% {
+    box-shadow: 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 78px 0 white, 72px 0 rgb(58, 181, 244);
+  }
+
+  87% {
+    box-shadow: 120px 0 rgba(58, 181, 244, 0), 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 78px 0 white;
+  }
+
+  100% {
+    box-shadow: 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0), 120px 0 rgba(255, 255, 255, 0), 120px 0 rgba(58, 181, 244, 0);
+  }
+}
+
 .wpv-chat__composer {
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--ws-hairline);
@@ -193,7 +310,7 @@ const CHAT_MODAL_CSS = `
 .wpv-chat__form {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -233,6 +350,13 @@ const CHAT_MODAL_CSS = `
   color: rgb(255 255 255 / 0.48);
 }
 
+.wpv-chat__input:focus {
+  background: var(--ws-well-5);
+  border-color: rgb(126 226 252 / 0.75);
+  box-shadow: 0 0 0 3px rgb(58 181 244 / 0.28);
+  outline: none;
+}
+
 .wpv-chat__input:user-invalid {
   border-color: #f87171;
 }
@@ -256,6 +380,9 @@ const CHAT_MODAL_CSS = `
 }
 
 .wpv-chat__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 6rem;
   padding: 0.5rem 1rem;
   border: 0;
@@ -265,10 +392,31 @@ const CHAT_MODAL_CSS = `
   font: inherit;
   font-size: 0.875rem;
   font-weight: 600;
+  transition: background-color 0.15s ease;
 }
 
 .wpv-chat__send:hover:not(:disabled) {
   background: var(--brand-700);
+}
+
+.wpv-chat__spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  animation: wpv-spin 1s linear infinite;
+}
+
+.wpv-chat__spinner-track {
+  opacity: 0.25;
+}
+
+.wpv-chat__spinner-head {
+  opacity: 0.75;
+}
+
+@keyframes wpv-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .wpv-chat__fab {
@@ -282,17 +430,45 @@ const CHAT_MODAL_CSS = `
   color: #fff;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .wpv-chat__fab:hover:not(:disabled) {
   background: var(--brand-700);
 }
 
-.wpv-chat__fab:focus-visible {
-  outline: 2px solid #7ee2fc;
-  outline-offset: 2px;
-}
-`;
+@media (prefers-reduced-motion: reduce) {
+  .wpv-chat__window,
+  .wpv-chat--open .wpv-chat__window,
+  .wpv-chat__fab-wrap {
+    transform: none;
+    transition-duration: 0.1s;
+  }
+
+  .wpv-chat--open .wpv-chat__window {
+    @starting-style {
+      transform: none;
+    }
+  }
+
+  .wpv-chat__line-loader {
+    animation: none;
+    width: 4.5rem;
+    height: 6px;
+    margin: 0.5rem 0;
+    border-radius: 0;
+    background:
+      radial-gradient(circle closest-side, rgb(58, 181, 244) 90%, transparent) 0 / 33% 100% no-repeat,
+      radial-gradient(circle closest-side, #fff 90%, transparent) 50% / 33% 100% no-repeat,
+      radial-gradient(circle closest-side, rgb(58, 181, 244) 90%, transparent) 100% / 33% 100% no-repeat;
+    box-shadow: none;
+  }
+
+  .wpv-chat__spinner {
+    animation: none;
+    opacity: 0.7;
+  }
+}`;
 
 function isEditorPath() {
   const file = location.pathname.split('/').pop() || '';
@@ -335,16 +511,72 @@ function svgIcon(paths, { size = 24, strokeWidth = 2 } = {}) {
   return svg;
 }
 
+function sendSpinner() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'wpv-chat__spinner');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  track.setAttribute('class', 'wpv-chat__spinner-track');
+  track.setAttribute('cx', '12');
+  track.setAttribute('cy', '12');
+  track.setAttribute('r', '10');
+  track.setAttribute('stroke', 'currentColor');
+  track.setAttribute('stroke-width', '4');
+
+  const head = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  head.setAttribute('class', 'wpv-chat__spinner-head');
+  head.setAttribute('fill', 'currentColor');
+  head.setAttribute('d', 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z');
+
+  svg.append(track, head);
+  return svg;
+}
+
 function robotAvatar() {
-  const avatar = document.createElement('span');
-  avatar.className = 'wpv-chat__avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.appendChild(svgIcon([
-    'M9 8V6a3 3 0 0 1 6 0v2',
-    'M7 9h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
-    'M9.5 13h.01M14.5 13h.01',
-  ], { size: 16, strokeWidth: 1.75 }));
-  return avatar;
+  const img = document.createElement('img');
+  img.className = 'wpv-chat__avatar';
+  img.src = chrome.runtime.getURL('assets/robot.png');
+  img.alt = 'Agent';
+  img.width = 28;
+  img.height = 28;
+  return img;
+}
+
+function initialsFromName(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function userAvatarUrl(name) {
+  const initials = escapeXml(initialsFromName(name));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="#0267c5"/><text x="14" y="15" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="11" font-weight="600">${initials}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function userAvatar(name) {
+  const img = document.createElement('img');
+  img.className = 'wpv-chat__avatar';
+  img.src = userAvatarUrl(name);
+  img.alt = '';
+  img.width = 28;
+  img.height = 28;
+  return img;
 }
 
 function el(tag, attrs = {}, children = []) {
@@ -369,19 +601,55 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-function setOpen(root, open) {
-  const windowEl = root.querySelector('.wpv-chat__window');
-  const fabWrap = root.querySelector('.wpv-chat__fab-wrap');
+function setOpen(root, open, { focus = true } = {}) {
   const collapse = root.querySelector('[data-action="collapse"]');
   const expand = root.querySelector('[data-action="expand"]');
 
-  windowEl.hidden = !open;
-  fabWrap.hidden = open;
+  root.classList.toggle('wpv-chat--open', open);
   collapse.setAttribute('aria-expanded', String(open));
   expand.setAttribute('aria-expanded', String(open));
 
+  if (!focus) return;
   const next = open ? collapse : expand;
   next.focus();
+}
+
+function installAutoScroll(messages) {
+  const state = { autoStickBottom: true };
+  const snap = () => {
+    if (state.autoStickBottom) messages.scrollTop = messages.scrollHeight;
+  };
+
+  snap();
+  new ResizeObserver(snap).observe(messages);
+  messages.addEventListener('load', snap, true);
+  messages.addEventListener('scroll', () => {
+    const distance = messages.scrollHeight - messages.scrollTop - messages.clientHeight;
+    state.autoStickBottom = distance < 50;
+  });
+
+  return {
+    scrollToBottom() {
+      state.autoStickBottom = true;
+      snap();
+    },
+  };
+}
+
+function createReplySound() {
+  try {
+    const sound = new Audio(chrome.runtime.getURL('assets/chat-notification.mp3'));
+    sound.volume = 0.3;
+    return sound;
+  } catch {
+    return null;
+  }
+}
+
+function playReplySound(sound) {
+  if (!sound) return;
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
 }
 
 function fallbackArticleSnapshot() {
@@ -392,6 +660,10 @@ function fallbackArticleSnapshot() {
     title: '',
     content: '',
     excerpt: '',
+    seo_title: '',
+    seo_description: '',
+    og_title: '',
+    og_description: '',
     editor_type: '',
     post_id: '',
     post_type: '',
@@ -433,6 +705,10 @@ async function articleSnapshot() {
       title: result.snapshot.title || fallback.title,
       content: result.snapshot.content || fallback.content,
       excerpt: result.snapshot.excerpt || fallback.excerpt,
+      seo_title: result.snapshot.seo_title || fallback.seo_title,
+      seo_description: result.snapshot.seo_description || fallback.seo_description,
+      og_title: result.snapshot.og_title || fallback.og_title,
+      og_description: result.snapshot.og_description || fallback.og_description,
       editor_type: result.snapshot.editor_type || fallback.editor_type,
     };
   } catch {
@@ -448,13 +724,21 @@ function compactArticle(article) {
 
 function hasEdits(edits) {
   if (!edits || typeof edits !== 'object') return false;
-  return ['title', 'content', 'excerpt'].some((key) => (
+  return EDIT_KEYS.some((key) => (
     typeof edits[key] === 'string' && edits[key].trim() !== ''
   ));
 }
 
 function describeApplied(applied) {
-  const labels = { title: 'title', body: 'body', excerpt: 'excerpt' };
+  const labels = {
+    title: 'title',
+    body: 'body',
+    excerpt: 'excerpt',
+    seo_title: 'SEO title',
+    seo_description: 'SEO description',
+    og_title: 'Open Graph title',
+    og_description: 'Open Graph description',
+  };
   const parts = (Array.isArray(applied) ? applied : [])
     .map((key) => labels[key])
     .filter(Boolean);
@@ -467,26 +751,65 @@ function describeApplied(applied) {
 async function applyEditorEdits(edits) {
   try {
     const result = await callEditorBridge('apply', { edits }, APPLY_TIMEOUT_MS);
-    if (!result?.ok) {
-      return {
-        status: 'Could not update the editor. Copy the suggested text in if you still want it.',
-        statusError: true,
-      };
-    }
-    const what = describeApplied(result.applied);
-    if (!what) {
+    const what = describeApplied(result?.applied);
+    if (what) return applySuccessStatus(what);
+    if (result?.ok) {
       return { status: 'No editor fields were changed.', statusError: false };
     }
-    return {
-      status: `Updated ${what} in the editor. Undo in the editor to revert.`,
-      statusError: false,
-    };
   } catch {
-    return {
-      status: 'Could not update the editor. Copy the suggested text in if you still want it.',
-      statusError: true,
-    };
+    // Bridge timeout/error — the editor may still have accepted the writes.
   }
+  const inferred = describeApplied(await inferAppliedFields(edits));
+  if (inferred) return applySuccessStatus(inferred);
+  return applyFailedStatus();
+}
+
+function applySuccessStatus(what) {
+  return {
+    status: `Updated ${what} in the editor.`,
+    statusError: false,
+  };
+}
+
+function applyFailedStatus() {
+  return {
+    status: 'Could not update the editor. Copy the suggested text in if you still want it.',
+    statusError: true,
+  };
+}
+
+async function inferAppliedFields(edits) {
+  const article = await articleSnapshot();
+  const applied = [];
+  if (edits.title && sameText(article.title, edits.title)) applied.push('title');
+  if (edits.excerpt && sameText(article.excerpt, edits.excerpt)) applied.push('excerpt');
+  if (edits.seo_title && sameText(article.seo_title, edits.seo_title)) applied.push('seo_title');
+  if (edits.seo_description && sameText(article.seo_description, edits.seo_description)) {
+    applied.push('seo_description');
+  }
+  if (edits.og_title && sameText(article.og_title, edits.og_title)) applied.push('og_title');
+  if (edits.og_description && sameText(article.og_description, edits.og_description)) {
+    applied.push('og_description');
+  }
+  if (edits.content && contentLooksApplied(article.content, edits.content)) {
+    applied.push('body');
+  }
+  return applied;
+}
+
+function sameText(a, b) {
+  return String(a || '').trim() === String(b || '').trim();
+}
+
+function contentLooksApplied(current, next) {
+  const a = plainText(current);
+  const b = plainText(next);
+  if (a.length < 20 || b.length < 20) return a !== '' && a === b;
+  return a.includes(b.slice(0, 80)) || b.includes(a.slice(0, 80));
+}
+
+function plainText(html) {
+  return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function syncAriaInvalid(input) {
@@ -497,15 +820,42 @@ function syncAriaInvalid(input) {
   }
 }
 
-function appendMessage(messages, { role, text, error = false, status = '', statusError = false }) {
+function thinkingRow() {
+  return el('li', {
+    className: 'wpv-chat__row wpv-chat__row--thinking',
+    'data-thinking': '',
+    'aria-hidden': 'true',
+  }, [
+    robotAvatar(),
+    el('div', { className: 'wpv-chat__line-loader' }),
+  ]);
+}
+
+function setThinking(messages, scroller, on) {
+  const existing = messages.querySelector('[data-thinking]');
+  if (on) {
+    if (!existing) messages.appendChild(thinkingRow());
+    scroller.scrollToBottom();
+    return;
+  }
+  existing?.remove();
+}
+
+function appendMessage(messages, scroller, {
+  role,
+  text,
+  userName = DEFAULT_USER_NAME,
+  error = false,
+  status = '',
+  statusError = false,
+}) {
   const isUser = role === 'user';
   const className = error
     ? 'wpv-chat__row wpv-chat__row--error'
     : isUser
       ? 'wpv-chat__row wpv-chat__row--user'
       : 'wpv-chat__row';
-  const children = [];
-  if (!isUser) children.push(robotAvatar());
+  const children = [isUser ? userAvatar(userName) : robotAvatar()];
   const bubbleChildren = [el('p', { text })];
   if (status) {
     bubbleChildren.push(el('p', {
@@ -515,12 +865,14 @@ function appendMessage(messages, { role, text, error = false, status = '', statu
   }
   children.push(el('div', { className: 'wpv-chat__bubble' }, bubbleChildren));
   messages.appendChild(el('li', { className }, children));
-  messages.scrollTop = messages.scrollHeight;
+  scroller.scrollToBottom();
 }
 
 function setComposerEnabled(root, { signedIn, busy }) {
   const input = root.querySelector(`#${INPUT_ID}`);
   const send = root.querySelector('.wpv-chat__send');
+  const label = root.querySelector('.wpv-chat__send-label');
+  const spinner = root.querySelector('.wpv-chat__send-spinner');
   const form = root.querySelector('.wpv-chat__form');
   const disabled = !signedIn || busy;
 
@@ -529,23 +881,36 @@ function setComposerEnabled(root, { signedIn, busy }) {
   input.required = signedIn && !busy;
   input.placeholder = signedIn ? SIGNED_IN_PLACEHOLDER : SIGNED_OUT_PLACEHOLDER;
   form.setAttribute('aria-busy', busy ? 'true' : 'false');
+  label.hidden = busy;
+  spinner.hidden = !busy;
 
   if (disabled) {
     input.removeAttribute('aria-invalid');
   }
 }
 
-async function readSignedIn() {
-  const { apiToken } = await chrome.storage.local.get('apiToken');
-  return typeof apiToken === 'string' && apiToken.length > 0;
+function displayName(value) {
+  return typeof value === 'string' && value.trim() !== ''
+    ? value.trim()
+    : DEFAULT_USER_NAME;
+}
+
+async function readAuthState() {
+  const { apiToken, apiUserName } = await chrome.storage.local.get(AUTH_KEYS);
+  return {
+    signedIn: typeof apiToken === 'string' && apiToken.length > 0,
+    userName: displayName(apiUserName),
+  };
 }
 
 function bindComposer(root) {
   const form = root.querySelector('.wpv-chat__form');
   const input = root.querySelector(`#${INPUT_ID}`);
   const messages = root.querySelector('.wpv-chat__messages');
+  const scroller = installAutoScroll(messages);
+  const replySound = createReplySound();
   const transcript = [];
-  const state = { signedIn: false, busy: false };
+  const state = { signedIn: false, busy: false, userName: DEFAULT_USER_NAME };
 
   const refreshComposer = () => setComposerEnabled(root, state);
 
@@ -573,10 +938,15 @@ function bindComposer(root) {
     input.value = '';
     input.removeAttribute('aria-invalid');
     transcript.push({ role: 'user', content: text });
-    appendMessage(messages, { role: 'user', text });
+    appendMessage(messages, scroller, {
+      role: 'user',
+      text,
+      userName: state.userName,
+    });
 
     state.busy = true;
     refreshComposer();
+    setThinking(messages, scroller, true);
 
     let result;
     try {
@@ -590,6 +960,8 @@ function bindComposer(root) {
       result = { ok: false, error: err.message || 'Chat failed.' };
     }
 
+    setThinking(messages, scroller, false);
+
     if (result?.ok && typeof result.reply === 'string') {
       transcript.push({ role: 'assistant', content: result.reply });
       let status = '';
@@ -599,35 +971,42 @@ function bindComposer(root) {
         status = applied.status;
         statusError = applied.statusError;
       }
-      appendMessage(messages, {
+      appendMessage(messages, scroller, {
         role: 'assistant',
         text: result.reply,
         status,
         statusError,
       });
+      playReplySound(replySound);
     } else {
-      appendMessage(messages, {
+      appendMessage(messages, scroller, {
         role: 'assistant',
         text: result?.error || 'Chat failed.',
         error: true,
       });
+      playReplySound(replySound);
     }
 
     state.busy = false;
-    state.signedIn = await readSignedIn();
+    Object.assign(state, await readAuthState());
     refreshComposer();
     if (state.signedIn) input.focus();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes.apiToken) return;
-    state.signedIn = typeof changes.apiToken.newValue === 'string'
-      && changes.apiToken.newValue.length > 0;
-    refreshComposer();
+    if (area !== 'local') return;
+    if (changes.apiToken) {
+      state.signedIn = typeof changes.apiToken.newValue === 'string'
+        && changes.apiToken.newValue.length > 0;
+    }
+    if (changes.apiUserName) {
+      state.userName = displayName(changes.apiUserName.newValue);
+    }
+    if (changes.apiToken || changes.apiUserName) refreshComposer();
   });
 
   (async () => {
-    state.signedIn = await readSignedIn();
+    Object.assign(state, await readAuthState());
     refreshComposer();
   })();
 }
@@ -637,7 +1016,7 @@ function buildShell() {
     type: 'button',
     className: 'wpv-chat__icon-button',
     'aria-label': 'Collapse chat',
-    'aria-expanded': 'true',
+    'aria-expanded': 'false',
     'aria-controls': PANEL_ID,
     'data-action': 'collapse',
   }, [svgIcon(['M19 9l-7 7-7-7'], { size: 24 })]);
@@ -653,7 +1032,7 @@ function buildShell() {
   }, [
     el('li', { className: 'wpv-chat__row' }, [
       robotAvatar(),
-      el('div', { className: 'wpv-chat__bubble' }, [greeting]),
+      el('div', { className: 'wpv-chat__bubble wpv-chat__bubble--greeting' }, [greeting]),
     ]),
   ]);
 
@@ -681,12 +1060,16 @@ function buildShell() {
     el('span', { text: 'Enter a message to send.' }),
   ]);
   const field = el('div', { className: 'wpv-chat__field' }, [input, fieldError]);
+  const sendLabel = el('span', { className: 'wpv-chat__send-label', text: 'Send' });
+  const spinnerWrap = el('span', {
+    className: 'wpv-chat__send-spinner',
+    hidden: true,
+  }, [sendSpinner()]);
   const send = el('button', {
     type: 'submit',
     className: 'wpv-chat__send',
     disabled: true,
-    text: 'Send',
-  });
+  }, [sendLabel, spinnerWrap]);
   const form = el('form', {
     className: 'wpv-chat__form',
     'aria-busy': 'false',
@@ -713,7 +1096,7 @@ function buildShell() {
     'data-action': 'expand',
   }, [svgIcon(['M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'], { size: 24 })]);
 
-  const fabWrap = el('div', { className: 'wpv-chat__fab-wrap', hidden: true }, [expand]);
+  const fabWrap = el('div', { className: 'wpv-chat__fab-wrap' }, [expand]);
   const root = el('aside', { className: 'wpv-chat', 'aria-label': 'Chat with Agent' }, [
     windowEl,
     fabWrap,
@@ -740,12 +1123,19 @@ async function mount() {
   const style = document.createElement('style');
   style.textContent = CHAT_MODAL_CSS;
   shadow.appendChild(style);
-  shadow.appendChild(buildShell());
+  const root = buildShell();
+  shadow.appendChild(root);
 
   await new Promise((resolve) => {
     requestAnimationFrame(() => {
       document.body.appendChild(host);
       resolve();
+    });
+  });
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setOpen(root, true, { focus: false });
     });
   });
 }

@@ -23,7 +23,7 @@ async function sendPluginChat({ message, history, article }) {
     payload = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
-      await chrome.storage.local.remove('apiToken');
+      await chrome.storage.local.remove(['apiToken', 'apiUserName']);
       return { ok: false, error: 'Session expired. Sign in via the Content Studio toolbar popup.' };
     }
 
@@ -51,7 +51,15 @@ function normaliseEdits(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
 
   const edits = {};
-  for (const key of ['title', 'content', 'excerpt']) {
+  for (const key of [
+    'title',
+    'content',
+    'excerpt',
+    'seo_title',
+    'seo_description',
+    'og_title',
+    'og_description',
+  ]) {
     if (typeof raw[key] === 'string' && raw[key].trim() !== '') {
       edits[key] = raw[key];
     }
