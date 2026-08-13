@@ -162,6 +162,16 @@
   overflow-wrap: anywhere;
 }
 
+.wpv-chat__bubble .wpv-chat__status {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.wpv-chat__bubble .wpv-chat__status--error {
+  color: #fca5a5;
+}
+
 .wpv-chat__composer {
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--ws-hairline);

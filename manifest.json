@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Content Studio Plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Attach to a WordPress admin session and inspect the article editor from the browser.",
   "permissions": ["tabs", "storage", "identity"],
   "host_permissions": ["*://*/wp-admin/*"],
@@ -28,6 +28,12 @@
       "matches": ["*://*/wp-admin/*"],
       "js": ["content/detect.js", "content/chat-modal.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*/wp-admin/*"],
+      "js": ["content/editor-bridge.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ]
 }

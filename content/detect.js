@@ -70,10 +70,16 @@ function detectContent() {
   return '';
 }
 
+function detectExcerpt() {
+  return valueOf('#excerpt');
+}
+
 function detectArticleSnapshot() {
   return {
     title: detectTitle(),
     content: detectContent(),
+    excerpt: detectExcerpt(),
+    editor_type: detectEditorType() || '',
     post_id: detectPostId(),
     post_type: detectPostType(),
     url: location.href,

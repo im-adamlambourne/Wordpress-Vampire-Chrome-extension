@@ -44,7 +44,19 @@ async function sendPluginChat({ message, history, article }) {
     return { ok: false, error: err.message || 'Chat failed.' };
   }
 
-  return { ok: true, reply: payload.reply };
+  return { ok: true, reply: payload.reply, edits: normaliseEdits(payload.edits) };
+}
+
+function normaliseEdits(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+  const edits = {};
+  for (const key of ['title', 'content', 'excerpt']) {
+    if (typeof raw[key] === 'string' && raw[key].trim() !== '') {
+      edits[key] = raw[key];
+    }
+  }
+  return edits;
 }
 
 function handlePluginChatMessage(message, sendResponse) {

@@ -2,10 +2,14 @@ const HOST_ID = 'wp-vampire-chat';
 const PANEL_ID = 'wpv-chat-panel';
 const INPUT_ID = 'wpv-chat-input';
 const FIELD_ERROR_ID = 'wpv-chat-input-error';
-const GREETING = 'I can help with this article. Ask me to review, rewrite, or explain the current draft.';
+const GREETING = 'I can help with this article. Ask me to review, rewrite, or apply changes to the current draft.';
 const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
 const SIGNED_IN_PLACEHOLDER = 'Type your message...';
 const MAX_HISTORY = 20;
+const EDITOR_COMMAND_EVENT = 'wpv-editor';
+const EDITOR_RESULT_EVENT = 'wpv-editor-result';
+const SNAPSHOT_TIMEOUT_MS = 4000;
+const APPLY_TIMEOUT_MS = 10000;
 
 // Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
 // URLs uses the page origin and is blocked (page CSP / no WAR), so the
@@ -169,6 +173,16 @@ const CHAT_MODAL_CSS = `
   font-weight: 400;
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+.wpv-chat__bubble .wpv-chat__status {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.wpv-chat__bubble .wpv-chat__status--error {
+  color: #fca5a5;
 }
 
 .wpv-chat__composer {
@@ -370,17 +384,109 @@ function setOpen(root, open) {
   next.focus();
 }
 
-function articleSnapshot() {
+function fallbackArticleSnapshot() {
   if (typeof detectArticleSnapshot === 'function') {
     return detectArticleSnapshot();
   }
   return {
     title: '',
     content: '',
+    excerpt: '',
+    editor_type: '',
     post_id: '',
     post_type: '',
     url: location.href,
   };
+}
+
+function callEditorBridge(type, extra = {}, timeoutMs = SNAPSHOT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timer = setTimeout(() => {
+      window.removeEventListener(EDITOR_RESULT_EVENT, onResult);
+      reject(new Error('Editor bridge timed out.'));
+    }, timeoutMs);
+
+    function onResult(event) {
+      if (event.detail?.requestId !== requestId) return;
+      clearTimeout(timer);
+      window.removeEventListener(EDITOR_RESULT_EVENT, onResult);
+      resolve(event.detail);
+    }
+
+    window.addEventListener(EDITOR_RESULT_EVENT, onResult);
+    window.dispatchEvent(new CustomEvent(EDITOR_COMMAND_EVENT, {
+      detail: { requestId, type, ...extra },
+    }));
+  });
+}
+
+async function articleSnapshot() {
+  const fallback = fallbackArticleSnapshot();
+  try {
+    const result = await callEditorBridge('snapshot', {}, SNAPSHOT_TIMEOUT_MS);
+    if (!result?.ok || !result.snapshot || typeof result.snapshot !== 'object') {
+      return fallback;
+    }
+    return {
+      ...fallback,
+      title: result.snapshot.title || fallback.title,
+      content: result.snapshot.content || fallback.content,
+      excerpt: result.snapshot.excerpt || fallback.excerpt,
+      editor_type: result.snapshot.editor_type || fallback.editor_type,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function compactArticle(article) {
+  const next = { ...article };
+  if (!next.editor_type) delete next.editor_type;
+  return next;
+}
+
+function hasEdits(edits) {
+  if (!edits || typeof edits !== 'object') return false;
+  return ['title', 'content', 'excerpt'].some((key) => (
+    typeof edits[key] === 'string' && edits[key].trim() !== ''
+  ));
+}
+
+function describeApplied(applied) {
+  const labels = { title: 'title', body: 'body', excerpt: 'excerpt' };
+  const parts = (Array.isArray(applied) ? applied : [])
+    .map((key) => labels[key])
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+async function applyEditorEdits(edits) {
+  try {
+    const result = await callEditorBridge('apply', { edits }, APPLY_TIMEOUT_MS);
+    if (!result?.ok) {
+      return {
+        status: 'Could not update the editor. Copy the suggested text in if you still want it.',
+        statusError: true,
+      };
+    }
+    const what = describeApplied(result.applied);
+    if (!what) {
+      return { status: 'No editor fields were changed.', statusError: false };
+    }
+    return {
+      status: `Updated ${what} in the editor. Undo in the editor to revert.`,
+      statusError: false,
+    };
+  } catch {
+    return {
+      status: 'Could not update the editor. Copy the suggested text in if you still want it.',
+      statusError: true,
+    };
+  }
 }
 
 function syncAriaInvalid(input) {
@@ -391,7 +497,7 @@ function syncAriaInvalid(input) {
   }
 }
 
-function appendMessage(messages, { role, text, error = false }) {
+function appendMessage(messages, { role, text, error = false, status = '', statusError = false }) {
   const isUser = role === 'user';
   const className = error
     ? 'wpv-chat__row wpv-chat__row--error'
@@ -400,7 +506,14 @@ function appendMessage(messages, { role, text, error = false }) {
       : 'wpv-chat__row';
   const children = [];
   if (!isUser) children.push(robotAvatar());
-  children.push(el('div', { className: 'wpv-chat__bubble' }, [el('p', { text })]));
+  const bubbleChildren = [el('p', { text })];
+  if (status) {
+    bubbleChildren.push(el('p', {
+      className: statusError ? 'wpv-chat__status wpv-chat__status--error' : 'wpv-chat__status',
+      text: status,
+    }));
+  }
+  children.push(el('div', { className: 'wpv-chat__bubble' }, bubbleChildren));
   messages.appendChild(el('li', { className }, children));
   messages.scrollTop = messages.scrollHeight;
 }
@@ -471,7 +584,7 @@ function bindComposer(root) {
         type: 'PLUGIN_CHAT',
         message: text,
         history: transcript.slice(-MAX_HISTORY),
-        article: articleSnapshot(),
+        article: compactArticle(await articleSnapshot()),
       });
     } catch (err) {
       result = { ok: false, error: err.message || 'Chat failed.' };
@@ -479,7 +592,19 @@ function bindComposer(root) {
 
     if (result?.ok && typeof result.reply === 'string') {
       transcript.push({ role: 'assistant', content: result.reply });
-      appendMessage(messages, { role: 'assistant', text: result.reply });
+      let status = '';
+      let statusError = false;
+      if (hasEdits(result.edits)) {
+        const applied = await applyEditorEdits(result.edits);
+        status = applied.status;
+        statusError = applied.statusError;
+      }
+      appendMessage(messages, {
+        role: 'assistant',
+        text: result.reply,
+        status,
+        statusError,
+      });
     } else {
       appendMessage(messages, {
         role: 'assistant',

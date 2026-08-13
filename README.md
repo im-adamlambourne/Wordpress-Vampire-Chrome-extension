@@ -22,7 +22,7 @@ The debug popup (toolbar icon) has a **Content Exchange** block above the WordPr
 2. **Save host** and allow the origin when Chrome asks.
 3. **Log in**. Chrome opens Content Exchange. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**.
 4. The popup closes during the bounce. Reopen it. Status should read **Signed in as {name}**.
-5. If the WordPress editor is already open, the **Chat with Agent** composer enables as soon as the token is stored (no tab reload required). Messages go to `POST /api/plugin/chat` (Gemini 3.5 Flash Lite) and replies stay in the overlay. The agent can review or suggest rewrites; it does not write into Gutenberg or Classic.
+5. If the WordPress editor is already open, the **Chat with Agent** composer enables as soon as the token is stored (no tab reload required). Messages go to `POST /api/plugin/chat` (Gemini 3.5 Flash Lite). Replies show in the overlay. When the agent returns `edits`, the extension writes title, body, and/or excerpt into the open Gutenberg or Classic editor. It does not save or publish; use WordPress Undo to revert.
 
 The host is stored in `chrome.storage.local` so you can point at local, staging, or production without rebuilding. Changing host clears the stored token.
 
@@ -45,12 +45,14 @@ Reopen popup
   → show name
 
 Editor chat (signed in)
-  → content/chat-modal.js PLUGIN_CHAT
+  → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
+  → PLUGIN_CHAT
   → service worker POST {host}/api/plugin/chat
-  → { reply } rendered in the overlay
+  → { reply, edits } rendered in the overlay
+  → non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data or Classic/TinyMCE)
 ```
 
-Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `popup/popup.html`, `content/chat-modal.js`.
+Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `popup/popup.html`, `content/chat-modal.js`, `content/editor-bridge.js`.
 
 ## Permissions
 
@@ -62,4 +64,4 @@ Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-cha
 
 ## Out of scope until asked
 
-Editor CRUD writes, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
+Save/publish, taxonomies, featured image, custom meta, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).

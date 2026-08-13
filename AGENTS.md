@@ -1,6 +1,6 @@
 # WordPress Vampire
 
-Chrome extension (Manifest V3) that attaches to self-hosted WordPress admin (`/wp-admin/`) so agents can inspect the article editor session and its form fields. Immediate Media branded (IM cyan-to-royal icon). Target: Gutenberg and Classic. Not WordPress.com Calypso.
+Chrome extension (Manifest V3) that attaches to self-hosted WordPress admin (`/wp-admin/`) so agents can inspect the article editor session and apply title, body, and excerpt edits to the open draft. Immediate Media branded (IM cyan-to-royal icon). Target: Gutenberg and Classic. Not WordPress.com Calypso.
 
 ## Agent skills (required)
 
@@ -30,16 +30,18 @@ Toolbar icon click
   → session + form field payload rendered in the popup
 
 Editor page (post.php / post-new.php)
-  → content/chat-modal.js (same isolated world, after detect.js)
+  → content/chat-modal.js (isolated world, after detect.js)
   → #wp-vampire-chat host + Shadow DOM
   → CEX-look floating chat shell
+  → snapshot via CustomEvent wpv-editor → content/editor-bridge.js (MAIN world)
   → send → chrome.runtime.sendMessage PLUGIN_CHAT
   → service worker POST {host}/api/plugin/chat (Bearer token)
-  → reply bubble in the overlay
+  → reply bubble; if edits, apply via the MAIN-world bridge (Gutenberg wp.data or Classic/TinyMCE)
 ```
 
-- **Content script** (`content/detect.js`) runs in the isolated world. It probes DOM only (no `window.wp`). On load it sends `SESSION_ATTACHED` so the service worker can paint a per-tab green status light on the toolbar icon. Other tabs stay red (disconnected). `GET_SESSION` returns attach state, editor type, post identity, REST root, and every `input` / `select` / `textarea` in the post form, Gutenberg chrome, and same-origin editor iframes. `detectArticleSnapshot()` supplies title plus truncated body text for chat.
-- **Chat overlay** (`content/chat-modal.js` + `content/chat-modal.css`) mounts only on Gutenberg/Classic. It injects a Shadow DOM shell (header, greeting bubble, composer, collapse/FAB) fixed to the bottom-right. The composer is enabled when a Content Exchange token is in `chrome.storage.local`. Send goes through the service worker (`PLUGIN_CHAT`) so the Sanctum token never enters the WordPress page. Transcripts stay in memory for the editor page session. Styles are inlined into the shadow `<style>` (page-origin `fetch()` of `chrome-extension://` is blocked). Keep `CHAT_MODAL_CSS` in sync with `content/chat-modal.css`. Do not add a manifest `content_scripts.css` entry.
+- **Content script** (`content/detect.js`) runs in the isolated world. It probes DOM only (no `window.wp`). On load it sends `SESSION_ATTACHED` so the service worker can paint a per-tab green status light on the toolbar icon. Other tabs stay red (disconnected). `GET_SESSION` returns attach state, editor type, post identity, REST root, and every `input` / `select` / `textarea` in the post form, Gutenberg chrome, and same-origin editor iframes. `detectArticleSnapshot()` is the DOM fallback for chat (title, truncated body, excerpt, editor type). Prefer the MAIN-world snapshot when the bridge is ready.
+- **Editor bridge** (`content/editor-bridge.js`) is a second content script with `"world": "MAIN"` so it can call `window.wp` and TinyMCE. Isolated overlay code talks to it with `CustomEvent` (`wpv-editor` / `wpv-editor-result`). Snapshot uses `wp.data.select('core/editor')` or TinyMCE/`#content`. Apply uses `editPost` + `resetBlocks` (Gutenberg, so native Undo still works) or field/TinyMCE writes (Classic). It never saves or publishes. Incoming HTML has `<script>` tags stripped. Do not add the `scripting` permission for this; the static MAIN-world entry is enough.
+- **Chat overlay** (`content/chat-modal.js` + `content/chat-modal.css`) mounts only on Gutenberg/Classic. It injects a Shadow DOM shell (header, greeting bubble, composer, collapse/FAB) fixed to the bottom-right. The composer is enabled when a Content Exchange token is in `chrome.storage.local`. Send goes through the service worker (`PLUGIN_CHAT`) so the Sanctum token never enters the WordPress page. After a reply, non-empty `edits` are applied through the bridge and a short status line is shown on the bubble. Transcripts stay in memory for the editor page session. Styles are inlined into the shadow `<style>` (page-origin `fetch()` of `chrome-extension://` is blocked). Keep `CHAT_MODAL_CSS` in sync with `content/chat-modal.css`. Do not add a manifest `content_scripts.css` entry.
 - **Popup** (`popup/`) is the debug screen. The Content Exchange block at the top stores a configurable Laravel host, bounces through `chrome.identity.launchWebAuthFlow` to sign in, and shows the CEX user name. WordPress session debug remains below. Keep the popup unless switching to a side panel (which then needs an explicit open trigger).
 - **Service worker** (`background/service-worker.js`) is stateless. No globals. Plugin login runs here (`background/plugin-auth.js`) so the identity window can outlive the popup. Chat HTTP runs here (`background/plugin-chat.js`) so optional host permissions apply and the token stays out of the content script. Persist host and token in `chrome.storage.local`, PKCE verifiers in `chrome.storage.session`, timers in `chrome.alarms`. It composites a green/red light onto the IM icon via `OffscreenCanvas` + `chrome.action.setIcon` (the badge API cannot draw a corner light).
 - **Permissions**: `tabs` (so `tab.url` is not silently `undefined`), `storage` (host + Sanctum token), `identity` (Laravel OAuth bounce), `host_permissions` `*://*/wp-admin/*`, and `optional_host_permissions` `http://*/*` + `https://*/*` requested at runtime for the configured Laravel origin. Do not add `scripting` until a feature needs it.
@@ -54,10 +56,10 @@ Editor page (post.php / post-new.php)
 ## Load and test
 
 1. `chrome://extensions` → Developer mode → Load unpacked → repo root.
-2. Reload the extension after code changes, then reload the WordPress tab so the content script reinjects.
+2. Reload the extension after code changes, then reload the WordPress tab so the content scripts reinject (isolated overlay and MAIN-world bridge).
 3. Open a post/page editor (`post.php` / `post-new.php`). The chat shell should appear bottom-right; the toolbar icon still opens the debug popup.
-4. Content Exchange login: this Sail app is `http://localhost` (port 80; README often says `http://localhost:8080`). Open the popup → Server `http://localhost` → Save host (allow access) → Log in → sign in to CEX (`admin@immediate.co.uk` / `password123` locally) → Connect. Reopen the popup; **Content Exchange** should show `Signed in as {name}`. The editor chat composer enables after login; send a question about the open draft and a `FlashLite_3_5` reply should appear.
+4. Content Exchange login: this Sail app is `http://localhost` (port 80; README often says `http://localhost:8080`). Open the popup → Server `http://localhost` → Save host (allow access) → Log in → sign in to CEX (`admin@immediate.co.uk` / `password123` locally) → Connect. Reopen the popup; **Content Exchange** should show `Signed in as {name}`. The editor chat composer enables after login. Ask a question about the draft for a `FlashLite_3_5` reply; ask to rewrite the title or body and the open editor should update (Undo in WordPress reverts). The post is not saved or published.
 
 ## Out of scope until asked
 
-Editor CRUD writes, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
+Save/publish, taxonomies, featured image, custom meta, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
