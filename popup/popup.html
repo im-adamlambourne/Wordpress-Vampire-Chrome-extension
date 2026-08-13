@@ -16,6 +16,30 @@
     </div>
   </header>
   <main>
+    <section id="cex-auth" aria-labelledby="cex-heading">
+      <h2 id="cex-heading">Content Exchange</h2>
+      <p id="cex-status" role="status" aria-live="polite">Checking sign-in…</p>
+      <form id="cex-host-form">
+        <label for="cex-host">Server</label>
+        <input
+          id="cex-host"
+          name="host"
+          type="url"
+          inputmode="url"
+          autocomplete="url"
+          enterkeyhint="done"
+          placeholder="http://localhost:8080"
+          required
+          aria-errormessage="cex-host-error"
+        >
+        <span id="cex-host-error" class="error-msg">Enter a valid http(s) server URL.</span>
+        <button type="submit" id="cex-save-host">Save host</button>
+      </form>
+      <div class="cex-actions">
+        <button type="button" id="cex-login">Log in</button>
+        <button type="button" id="cex-logout" class="secondary" hidden>Log out</button>
+      </div>
+    </section>
     <p id="connection-status" role="status" aria-live="polite">Checking session…</p>
     <dl id="session-details"></dl>
     <section id="fields-section" hidden>
@@ -36,6 +60,7 @@
     </section>
     <button type="button" id="refresh">Refresh</button>
   </main>
+  <script src="../background/pkce.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

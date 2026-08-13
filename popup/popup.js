@@ -4,6 +4,175 @@ const fieldsSection = document.getElementById('fields-section');
 const fieldsCaption = document.getElementById('fields-caption');
 const fieldRows = document.getElementById('field-rows');
 const refreshBtn = document.getElementById('refresh');
+const cexStatusEl = document.getElementById('cex-status');
+const hostForm = document.getElementById('cex-host-form');
+const hostInput = document.getElementById('cex-host');
+const loginBtn = document.getElementById('cex-login');
+const logoutBtn = document.getElementById('cex-logout');
+
+let pendingPkce = null;
+
+async function refreshPkce() {
+  pendingPkce = await generatePkce();
+}
+
+refreshPkce();
+
+function setCexStatus(state, message) {
+  cexStatusEl.dataset.state = state;
+  cexStatusEl.textContent = message;
+}
+
+function syncHostAria(event) {
+  const input = event.target;
+  if (input !== hostInput || !input.matches) return;
+  if (input.matches(':user-invalid')) {
+    input.setAttribute('aria-invalid', 'true');
+  } else {
+    input.removeAttribute('aria-invalid');
+  }
+}
+
+hostInput.addEventListener('blur', syncHostAria, true);
+hostInput.addEventListener('focus', syncHostAria, true);
+hostInput.addEventListener('input', (event) => {
+  if (hostInput.getAttribute('aria-invalid') === 'true') {
+    syncHostAria(event);
+  }
+});
+
+async function loadCexAuth() {
+  const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
+  if (apiHost) {
+    hostInput.value = apiHost;
+  }
+
+  logoutBtn.hidden = !apiToken;
+
+  if (!apiHost) {
+    setCexStatus('signed-out', 'Save a server URL, then log in.');
+    return;
+  }
+
+  if (!apiToken) {
+    setCexStatus('signed-out', 'Not signed in.');
+    return;
+  }
+
+  setCexStatus('checking', 'Checking Content Exchange session…');
+
+  try {
+    const response = await fetch(`${apiHost}/api/plugin/me`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiToken}`,
+      },
+    });
+
+    if (response.status === 401) {
+      await chrome.storage.local.remove('apiToken');
+      logoutBtn.hidden = true;
+      setCexStatus('signed-out', 'Session expired. Log in again.');
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Could not load the signed-in user (${response.status}).`);
+    }
+
+    const user = await response.json();
+    const name = user.name || user.email || 'Unknown user';
+    setCexStatus('signed-in', `Signed in as ${name}`);
+    logoutBtn.hidden = false;
+  } catch (err) {
+    setCexStatus('error', err.message || 'Could not reach Content Exchange.');
+  }
+}
+
+hostForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  let host;
+  try {
+    host = normalizeApiHost(hostInput.value);
+    hostInput.setCustomValidity('');
+  } catch (err) {
+    hostInput.setCustomValidity(err.message);
+    hostInput.reportValidity();
+    return;
+  }
+
+  const granted = await chrome.permissions.request({ origins: [hostOriginPattern(host)] });
+  if (!granted) {
+    setCexStatus('error', 'Host permission was not granted.');
+    return;
+  }
+
+  const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
+  if (previousHost && previousHost !== host) {
+    await chrome.storage.local.remove('apiToken');
+  }
+
+  await chrome.storage.local.set({ apiHost: host });
+  hostInput.value = host;
+  await loadCexAuth();
+  if (!previousHost || previousHost !== host) {
+    setCexStatus('signed-out', 'Host saved. Log in to connect.');
+  }
+});
+
+loginBtn.addEventListener('click', async () => {
+  let host;
+  try {
+    host = normalizeApiHost(hostInput.value);
+  } catch (err) {
+    setCexStatus('error', err.message);
+    return;
+  }
+
+  if (!pendingPkce) {
+    setCexStatus('error', 'Login is not ready yet. Try again.');
+    refreshPkce();
+    return;
+  }
+
+  const pkce = pendingPkce;
+  pendingPkce = null;
+  refreshPkce();
+
+  setCexStatus('checking', 'Opening Content Exchange to sign in…');
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'PLUGIN_LOGIN',
+      host,
+      verifier: pkce.verifier,
+      challenge: pkce.challenge,
+      state: pkce.state,
+    });
+    if (!response?.ok) {
+      setCexStatus('error', response?.error || 'Login failed.');
+      return;
+    }
+    await loadCexAuth();
+  } catch (err) {
+    setCexStatus('error', err.message || 'Login failed.');
+  }
+});
+
+logoutBtn.addEventListener('click', async () => {
+  try {
+    await chrome.runtime.sendMessage({ type: 'PLUGIN_LOGOUT' });
+    await loadCexAuth();
+  } catch (err) {
+    setCexStatus('error', err.message || 'Logout failed.');
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes.apiToken || changes.apiHost)) {
+    loadCexAuth();
+  }
+});
 
 function isWpAdminUrl(url) {
   if (!url) return false;
@@ -152,4 +321,5 @@ refreshBtn.addEventListener('click', () => {
   loadSession();
 });
 
+loadCexAuth();
 loadSession();

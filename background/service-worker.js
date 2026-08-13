@@ -1,3 +1,5 @@
+importScripts('pkce.js', 'plugin-auth.js');
+
 const LIGHT_CONNECTED = '#22c55e';
 const LIGHT_DISCONNECTED = '#ef4444';
 const ICON_SIZES = [16, 32];
@@ -79,7 +81,11 @@ function isWpAdminUrl(url) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (handlePluginAuthMessage(message, sendResponse)) {
+    return true;
+  }
+
   const tabId = sender.tab?.id;
   if (tabId == null) return;
 

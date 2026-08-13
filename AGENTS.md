@@ -31,9 +31,9 @@ Editor page (post.php / post-new.php)
 
 - **Content script** (`content/detect.js`) runs in the isolated world. It probes DOM only (no `window.wp`). On load it sends `SESSION_ATTACHED` so the service worker can paint a per-tab green status light on the toolbar icon. Other tabs stay red (disconnected). `GET_SESSION` returns attach state, editor type, post identity, REST root, and every `input` / `select` / `textarea` in the post form, Gutenberg chrome, and same-origin editor iframes.
 - **Chat overlay** (`content/chat-modal.js` + `content/chat-modal.css`) mounts only on Gutenberg/Classic. It injects a Shadow DOM shell (header, greeting bubble, disabled composer, collapse/FAB) fixed to the bottom-right. No send, transcripts, or backend. Styles are inlined into the shadow `<style>` (page-origin `fetch()` of `chrome-extension://` is blocked). Keep `CHAT_MODAL_CSS` in sync with `content/chat-modal.css`. Do not add a manifest `content_scripts.css` entry.
-- **Popup** (`popup/`) is the debug screen. No `default_popup` means `chrome.action.onClicked` would fire instead — keep the popup unless switching to a side panel (which then needs an explicit open trigger).
-- **Service worker** (`background/service-worker.js`) is stateless. No globals. It composites a green/red light onto the IM icon via `OffscreenCanvas` + `chrome.action.setIcon` (the badge API cannot draw a corner light). Persist later state in `chrome.storage`, timers in `chrome.alarms`.
-- **Permissions stay tight**: `tabs` (so `tab.url` is not silently `undefined`), `host_permissions` `*://*/wp-admin/*`. Do not add `storage` or `scripting` until a feature needs them.
+- **Popup** (`popup/`) is the debug screen. The Content Exchange block at the top stores a configurable Laravel host, bounces through `chrome.identity.launchWebAuthFlow` to sign in, and shows the CEX user name. WordPress session debug remains below. Keep the popup unless switching to a side panel (which then needs an explicit open trigger).
+- **Service worker** (`background/service-worker.js`) is stateless. No globals. Plugin login runs here (`background/plugin-auth.js`) so the identity window can outlive the popup. Persist host and token in `chrome.storage.local`, PKCE verifiers in `chrome.storage.session`, timers in `chrome.alarms`. It composites a green/red light onto the IM icon via `OffscreenCanvas` + `chrome.action.setIcon` (the badge API cannot draw a corner light).
+- **Permissions**: `tabs` (so `tab.url` is not silently `undefined`), `storage` (host + Sanctum token), `identity` (Laravel OAuth bounce), `host_permissions` `*://*/wp-admin/*`, and `optional_host_permissions` `http://*/*` + `https://*/*` requested at runtime for the configured Laravel origin. Do not add `scripting` until a feature needs it.
 
 ## Conventions
 
@@ -47,6 +47,7 @@ Editor page (post.php / post-new.php)
 1. `chrome://extensions` → Developer mode → Load unpacked → repo root.
 2. Reload the extension after code changes, then reload the WordPress tab so the content script reinjects.
 3. Open a post/page editor (`post.php` / `post-new.php`). The chat shell should appear bottom-right; the toolbar icon still opens the debug popup.
+4. Content Exchange login: this Sail app is `http://localhost` (port 80; README often says `http://localhost:8080`). Open the popup → Server `http://localhost` → Save host (allow access) → Log in → sign in to CEX (`admin@immediate.co.uk` / `password123` locally) → Connect. Reopen the popup; **Content Exchange** should show `Signed in as {name}`.
 
 ## Out of scope until asked
 
