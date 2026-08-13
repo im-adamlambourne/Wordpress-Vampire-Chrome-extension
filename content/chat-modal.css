@@ -99,7 +99,9 @@
 .wpv-chat__messages {
   flex: 1;
   overflow-y: auto;
+  margin: 0;
   padding: 0.75rem;
+  list-style: none;
   scrollbar-width: none;
 }
 
@@ -111,6 +113,14 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
+}
+
+.wpv-chat__row + .wpv-chat__row {
+  margin-top: 0.5rem;
+}
+
+.wpv-chat__row--user {
+  flex-direction: row-reverse;
 }
 
 .wpv-chat__avatar {
@@ -135,6 +145,15 @@
   border-radius: 0 0.75rem 0.75rem 0.75rem;
 }
 
+.wpv-chat__row--user .wpv-chat__bubble {
+  background: var(--brand-600);
+  border-radius: 0.75rem 0 0.75rem 0.75rem;
+}
+
+.wpv-chat__row--error .wpv-chat__bubble {
+  background: #7f1d1d;
+}
+
 .wpv-chat__bubble p {
   margin: 0;
   font-size: 0.875rem;
@@ -151,8 +170,16 @@
 .wpv-chat__form {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
+}
+
+.wpv-chat__field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .wpv-chat__visually-hidden {
@@ -181,6 +208,22 @@
 
 .wpv-chat__input::placeholder {
   color: rgb(255 255 255 / 0.48);
+}
+
+.wpv-chat__input:user-invalid {
+  border-color: #f87171;
+}
+
+.wpv-chat__field-error {
+  display: none;
+  color: #fca5a5;
+  font-size: 0.75rem;
+}
+
+.wpv-chat__input:user-invalid + .wpv-chat__field-error {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .wpv-chat__input:disabled,

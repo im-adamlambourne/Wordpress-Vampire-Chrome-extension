@@ -1,7 +1,11 @@
 const HOST_ID = 'wp-vampire-chat';
 const PANEL_ID = 'wpv-chat-panel';
 const INPUT_ID = 'wpv-chat-input';
+const FIELD_ERROR_ID = 'wpv-chat-input-error';
 const GREETING = 'I can help with this article. Ask me to review, rewrite, or explain the current draft.';
+const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
+const SIGNED_IN_PLACEHOLDER = 'Type your message...';
+const MAX_HISTORY = 20;
 
 // Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
 // URLs uses the page origin and is blocked (page CSP / no WAR), so the
@@ -104,7 +108,9 @@ const CHAT_MODAL_CSS = `
 .wpv-chat__messages {
   flex: 1;
   overflow-y: auto;
+  margin: 0;
   padding: 0.75rem;
+  list-style: none;
   scrollbar-width: none;
 }
 
@@ -116,6 +122,14 @@ const CHAT_MODAL_CSS = `
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
+}
+
+.wpv-chat__row + .wpv-chat__row {
+  margin-top: 0.5rem;
+}
+
+.wpv-chat__row--user {
+  flex-direction: row-reverse;
 }
 
 .wpv-chat__avatar {
@@ -140,6 +154,15 @@ const CHAT_MODAL_CSS = `
   border-radius: 0 0.75rem 0.75rem 0.75rem;
 }
 
+.wpv-chat__row--user .wpv-chat__bubble {
+  background: var(--brand-600);
+  border-radius: 0.75rem 0 0.75rem 0.75rem;
+}
+
+.wpv-chat__row--error .wpv-chat__bubble {
+  background: #7f1d1d;
+}
+
 .wpv-chat__bubble p {
   margin: 0;
   font-size: 0.875rem;
@@ -156,8 +179,16 @@ const CHAT_MODAL_CSS = `
 .wpv-chat__form {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
+}
+
+.wpv-chat__field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .wpv-chat__visually-hidden {
@@ -186,6 +217,22 @@ const CHAT_MODAL_CSS = `
 
 .wpv-chat__input::placeholder {
   color: rgb(255 255 255 / 0.48);
+}
+
+.wpv-chat__input:user-invalid {
+  border-color: #f87171;
+}
+
+.wpv-chat__field-error {
+  display: none;
+  color: #fca5a5;
+  font-size: 0.75rem;
+}
+
+.wpv-chat__input:user-invalid + .wpv-chat__field-error {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .wpv-chat__input:disabled,
@@ -323,6 +370,143 @@ function setOpen(root, open) {
   next.focus();
 }
 
+function articleSnapshot() {
+  if (typeof detectArticleSnapshot === 'function') {
+    return detectArticleSnapshot();
+  }
+  return {
+    title: '',
+    content: '',
+    post_id: '',
+    post_type: '',
+    url: location.href,
+  };
+}
+
+function syncAriaInvalid(input) {
+  if (!input.checkValidity()) {
+    input.setAttribute('aria-invalid', 'true');
+  } else {
+    input.removeAttribute('aria-invalid');
+  }
+}
+
+function appendMessage(messages, { role, text, error = false }) {
+  const isUser = role === 'user';
+  const className = error
+    ? 'wpv-chat__row wpv-chat__row--error'
+    : isUser
+      ? 'wpv-chat__row wpv-chat__row--user'
+      : 'wpv-chat__row';
+  const children = [];
+  if (!isUser) children.push(robotAvatar());
+  children.push(el('div', { className: 'wpv-chat__bubble' }, [el('p', { text })]));
+  messages.appendChild(el('li', { className }, children));
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function setComposerEnabled(root, { signedIn, busy }) {
+  const input = root.querySelector(`#${INPUT_ID}`);
+  const send = root.querySelector('.wpv-chat__send');
+  const form = root.querySelector('.wpv-chat__form');
+  const disabled = !signedIn || busy;
+
+  input.disabled = disabled;
+  send.disabled = disabled;
+  input.required = signedIn && !busy;
+  input.placeholder = signedIn ? SIGNED_IN_PLACEHOLDER : SIGNED_OUT_PLACEHOLDER;
+  form.setAttribute('aria-busy', busy ? 'true' : 'false');
+
+  if (disabled) {
+    input.removeAttribute('aria-invalid');
+  }
+}
+
+async function readSignedIn() {
+  const { apiToken } = await chrome.storage.local.get('apiToken');
+  return typeof apiToken === 'string' && apiToken.length > 0;
+}
+
+function bindComposer(root) {
+  const form = root.querySelector('.wpv-chat__form');
+  const input = root.querySelector(`#${INPUT_ID}`);
+  const messages = root.querySelector('.wpv-chat__messages');
+  const transcript = [];
+  const state = { signedIn: false, busy: false };
+
+  const refreshComposer = () => setComposerEnabled(root, state);
+
+  input.addEventListener('blur', () => {
+    if (!input.disabled) syncAriaInvalid(input);
+  });
+  input.addEventListener('input', () => {
+    if (input.getAttribute('aria-invalid') === 'true') syncAriaInvalid(input);
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (state.busy || !state.signedIn) return;
+    if (!form.reportValidity()) {
+      syncAriaInvalid(input);
+      return;
+    }
+
+    const text = input.value.trim();
+    if (!text) {
+      syncAriaInvalid(input);
+      return;
+    }
+
+    input.value = '';
+    input.removeAttribute('aria-invalid');
+    transcript.push({ role: 'user', content: text });
+    appendMessage(messages, { role: 'user', text });
+
+    state.busy = true;
+    refreshComposer();
+
+    let result;
+    try {
+      result = await chrome.runtime.sendMessage({
+        type: 'PLUGIN_CHAT',
+        message: text,
+        history: transcript.slice(-MAX_HISTORY),
+        article: articleSnapshot(),
+      });
+    } catch (err) {
+      result = { ok: false, error: err.message || 'Chat failed.' };
+    }
+
+    if (result?.ok && typeof result.reply === 'string') {
+      transcript.push({ role: 'assistant', content: result.reply });
+      appendMessage(messages, { role: 'assistant', text: result.reply });
+    } else {
+      appendMessage(messages, {
+        role: 'assistant',
+        text: result?.error || 'Chat failed.',
+        error: true,
+      });
+    }
+
+    state.busy = false;
+    state.signedIn = await readSignedIn();
+    refreshComposer();
+    if (state.signedIn) input.focus();
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.apiToken) return;
+    state.signedIn = typeof changes.apiToken.newValue === 'string'
+      && changes.apiToken.newValue.length > 0;
+    refreshComposer();
+  });
+
+  (async () => {
+    state.signedIn = await readSignedIn();
+    refreshComposer();
+  })();
+}
+
 function buildShell() {
   const collapse = el('button', {
     type: 'button',
@@ -334,12 +518,15 @@ function buildShell() {
   }, [svgIcon(['M19 9l-7 7-7-7'], { size: 24 })]);
 
   const greeting = el('p', { text: GREETING });
-  const messages = el('div', {
+  const messages = el('ul', {
     className: 'wpv-chat__messages',
     tabindex: '0',
     'aria-label': 'Chat messages',
+    'aria-live': 'polite',
+    'aria-relevant': 'additions',
+    role: 'list',
   }, [
-    el('div', { className: 'wpv-chat__row' }, [
+    el('li', { className: 'wpv-chat__row' }, [
       robotAvatar(),
       el('div', { className: 'wpv-chat__bubble' }, [greeting]),
     ]),
@@ -354,16 +541,31 @@ function buildShell() {
     id: INPUT_ID,
     className: 'wpv-chat__input',
     type: 'text',
-    placeholder: 'Type your message...',
+    name: 'message',
+    placeholder: SIGNED_OUT_PLACEHOLDER,
+    autocomplete: 'off',
+    maxlength: '8000',
+    'aria-errormessage': FIELD_ERROR_ID,
     disabled: true,
   });
+  const fieldError = el('div', {
+    id: FIELD_ERROR_ID,
+    className: 'wpv-chat__field-error',
+  }, [
+    el('span', { 'aria-hidden': 'true', text: '!' }),
+    el('span', { text: 'Enter a message to send.' }),
+  ]);
+  const field = el('div', { className: 'wpv-chat__field' }, [input, fieldError]);
   const send = el('button', {
     type: 'submit',
     className: 'wpv-chat__send',
     disabled: true,
     text: 'Send',
   });
-  const form = el('form', { className: 'wpv-chat__form' }, [label, input, send]);
+  const form = el('form', {
+    className: 'wpv-chat__form',
+    'aria-busy': 'false',
+  }, [label, field, send]);
 
   const windowEl = el('div', {
     id: PANEL_ID,
@@ -394,7 +596,7 @@ function buildShell() {
 
   collapse.addEventListener('click', () => setOpen(root, false));
   expand.addEventListener('click', () => setOpen(root, true));
-  form.addEventListener('submit', (event) => event.preventDefault());
+  bindComposer(root);
 
   return root;
 }

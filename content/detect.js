@@ -53,6 +53,33 @@ function detectTitle() {
     || '';
 }
 
+const MAX_ARTICLE_CHARS = 20000;
+
+function detectContent() {
+  for (const root of editorRoots()) {
+    const writing = root.querySelector('.block-editor-writing-flow')
+      || root.querySelector('.wp-block-post-content')
+      || root.querySelector('.editor-styles-wrapper');
+    const text = writing?.innerText?.trim();
+    if (text) return text.slice(0, MAX_ARTICLE_CHARS);
+  }
+
+  const classic = valueOf('#content');
+  if (classic) return classic.slice(0, MAX_ARTICLE_CHARS);
+
+  return '';
+}
+
+function detectArticleSnapshot() {
+  return {
+    title: detectTitle(),
+    content: detectContent(),
+    post_id: detectPostId(),
+    post_type: detectPostType(),
+    url: location.href,
+  };
+}
+
 function detectRestRoot() {
   return document.querySelector('link[rel="https://api.w.org/"]')?.href || '';
 }

@@ -1,4 +1,4 @@
-importScripts('pkce.js', 'plugin-auth.js');
+importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js');
 
 const LIGHT_CONNECTED = '#22c55e';
 const LIGHT_DISCONNECTED = '#ef4444';
@@ -83,6 +83,10 @@ function isWpAdminUrl(url) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (handlePluginAuthMessage(message, sendResponse)) {
+    return true;
+  }
+
+  if (handlePluginChatMessage(message, sendResponse)) {
     return true;
   }
 

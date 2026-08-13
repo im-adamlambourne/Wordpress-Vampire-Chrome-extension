@@ -7,7 +7,7 @@ the CEX user.
 Immediate Media branded. Targets Gutenberg and Classic. Not WordPress.com Calypso.
 
 The Laravel endpoints live in `content-exchange-v2` — see
-`core/docs/Content-Studio-Plugin-Auth.md`.
+`core/docs/Content-Studio-Plugin-Auth.md` (login plus `POST /api/plugin/chat`).
 
 ## Load unpacked
 
@@ -22,6 +22,7 @@ The debug popup (toolbar icon) has a **Content Exchange** block above the WordPr
 2. **Save host** and allow the origin when Chrome asks.
 3. **Log in**. Chrome opens Content Exchange. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**.
 4. The popup closes during the bounce. Reopen it. Status should read **Signed in as {name}**.
+5. If the WordPress editor is already open, the **Chat with Agent** composer enables as soon as the token is stored (no tab reload required). Messages go to `POST /api/plugin/chat` (Gemini 3.5 Flash Lite) and replies stay in the overlay. The agent can review or suggest rewrites; it does not write into Gutenberg or Classic.
 
 The host is stored in `chrome.storage.local` so you can point at local, staging, or production without rebuilding. Changing host clears the stored token.
 
@@ -42,9 +43,14 @@ Log in
 Reopen popup
   → GET {host}/api/plugin/me  Authorization: Bearer
   → show name
+
+Editor chat (signed in)
+  → content/chat-modal.js PLUGIN_CHAT
+  → service worker POST {host}/api/plugin/chat
+  → { reply } rendered in the overlay
 ```
 
-Files: `background/pkce.js`, `background/plugin-auth.js`, `popup/popup.html`.
+Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `popup/popup.html`, `content/chat-modal.js`.
 
 ## Permissions
 
@@ -56,4 +62,4 @@ Files: `background/pkce.js`, `background/plugin-auth.js`, `popup/popup.html`.
 
 ## Out of scope until asked
 
-Chat send/transcripts, editor CRUD writes, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
+Editor CRUD writes, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
