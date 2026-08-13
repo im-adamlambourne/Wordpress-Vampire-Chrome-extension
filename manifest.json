@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "WordPress Vampire",
+  "version": "0.1.0",
+  "description": "Attach to a WordPress admin session and inspect the article editor from the browser.",
+  "permissions": ["tabs"],
+  "host_permissions": ["*://*/wp-admin/*"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "WordPress Vampire",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/wp-admin/*"],
+      "js": ["content/detect.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
