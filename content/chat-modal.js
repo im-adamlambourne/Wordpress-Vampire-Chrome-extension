@@ -1,0 +1,450 @@
+const HOST_ID = 'wp-vampire-chat';
+const PANEL_ID = 'wpv-chat-panel';
+const INPUT_ID = 'wpv-chat-input';
+const GREETING = 'I can help with this article. Ask me to review, rewrite, or explain the current draft.';
+
+// Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
+// URLs uses the page origin and is blocked (page CSP / no WAR), so the
+// stylesheet must ship in this file.
+const CHAT_MODAL_CSS = `
+:host {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000100;
+  display: block;
+  font-family: system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.wpv-chat {
+  --ws-well-4: #022240;
+  --ws-well-5: #021d36;
+  --ws-hairline: rgba(255, 255, 255, 0.14);
+  --brand-600: #0267c5;
+  --brand-700: #0156a6;
+  --window-fill: rgba(31, 41, 55, 0.6);
+  --window-border: #374151;
+  --bubble-fill: #374151;
+  --text: #f3f4f6;
+  --text-muted: rgba(255, 255, 255, 0.55);
+
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.wpv-chat__window[hidden],
+.wpv-chat__fab-wrap[hidden] {
+  display: none;
+}
+
+.wpv-chat__window {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 21rem;
+  height: 40rem;
+  max-height: calc(100vh - 2rem);
+  background: var(--window-fill);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--window-border);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+}
+
+.wpv-chat__header,
+.wpv-chat__composer {
+  flex-shrink: 0;
+  background: var(--ws-well-5);
+}
+
+.wpv-chat__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--ws-hairline);
+}
+
+.wpv-chat__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.wpv-chat__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.wpv-chat__icon-button:hover:not(:disabled) {
+  color: #fff;
+}
+
+.wpv-chat__icon-button:focus-visible {
+  outline: 2px solid #7ee2fc;
+  outline-offset: 2px;
+}
+
+.wpv-chat__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  scrollbar-width: none;
+}
+
+.wpv-chat__messages::-webkit-scrollbar {
+  display: none;
+}
+
+.wpv-chat__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.wpv-chat__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--ws-well-4);
+  color: #7ee2fc;
+}
+
+.wpv-chat__bubble {
+  display: flex;
+  flex-direction: column;
+  max-width: 90%;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+  background: var(--bubble-fill);
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+}
+
+.wpv-chat__bubble p {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.wpv-chat__composer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--ws-hairline);
+}
+
+.wpv-chat__form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wpv-chat__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.wpv-chat__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 0.75rem;
+  background: var(--ws-well-4);
+  color: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.wpv-chat__input::placeholder {
+  color: rgb(255 255 255 / 0.48);
+}
+
+.wpv-chat__input:disabled,
+.wpv-chat__send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wpv-chat__send {
+  width: 6rem;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--brand-600);
+  color: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.wpv-chat__send:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+
+.wpv-chat__fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand-600);
+  color: #fff;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+}
+
+.wpv-chat__fab:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+
+.wpv-chat__fab:focus-visible {
+  outline: 2px solid #7ee2fc;
+  outline-offset: 2px;
+}
+`;
+
+function isEditorPath() {
+  const file = location.pathname.split('/').pop() || '';
+  return file === 'post.php' || file === 'post-new.php';
+}
+
+function editorType() {
+  return typeof detectEditorType === 'function' ? detectEditorType() : null;
+}
+
+function shouldMount() {
+  const type = editorType();
+  return type === 'gutenberg' || type === 'classic' || isEditorPath();
+}
+
+function editorChromePresent() {
+  return !!document.getElementById('editor')
+    || document.body?.classList.contains('block-editor-page')
+    || !!document.querySelector('.block-editor, .edit-post-layout');
+}
+
+function svgIcon(paths, { size = 24, strokeWidth = 2 } = {}) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+
+  for (const d of paths) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-width', String(strokeWidth));
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+
+  return svg;
+}
+
+function robotAvatar() {
+  const avatar = document.createElement('span');
+  avatar.className = 'wpv-chat__avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.appendChild(svgIcon([
+    'M9 8V6a3 3 0 0 1 6 0v2',
+    'M7 9h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
+    'M9.5 13h.01M14.5 13h.01',
+  ], { size: 16, strokeWidth: 1.75 }));
+  return avatar;
+}
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === false || value == null) continue;
+    if (value === true) {
+      node.setAttribute(key, '');
+      continue;
+    }
+    if (key === 'className') {
+      node.className = value;
+      continue;
+    }
+    if (key === 'text') {
+      node.textContent = value;
+      continue;
+    }
+    node.setAttribute(key, value);
+  }
+  for (const child of children) node.appendChild(child);
+  return node;
+}
+
+function setOpen(root, open) {
+  const windowEl = root.querySelector('.wpv-chat__window');
+  const fabWrap = root.querySelector('.wpv-chat__fab-wrap');
+  const collapse = root.querySelector('[data-action="collapse"]');
+  const expand = root.querySelector('[data-action="expand"]');
+
+  windowEl.hidden = !open;
+  fabWrap.hidden = open;
+  collapse.setAttribute('aria-expanded', String(open));
+  expand.setAttribute('aria-expanded', String(open));
+
+  const next = open ? collapse : expand;
+  next.focus();
+}
+
+function buildShell() {
+  const collapse = el('button', {
+    type: 'button',
+    className: 'wpv-chat__icon-button',
+    'aria-label': 'Collapse chat',
+    'aria-expanded': 'true',
+    'aria-controls': PANEL_ID,
+    'data-action': 'collapse',
+  }, [svgIcon(['M19 9l-7 7-7-7'], { size: 24 })]);
+
+  const greeting = el('p', { text: GREETING });
+  const messages = el('div', {
+    className: 'wpv-chat__messages',
+    tabindex: '0',
+    'aria-label': 'Chat messages',
+  }, [
+    el('div', { className: 'wpv-chat__row' }, [
+      robotAvatar(),
+      el('div', { className: 'wpv-chat__bubble' }, [greeting]),
+    ]),
+  ]);
+
+  const label = el('label', {
+    className: 'wpv-chat__visually-hidden',
+    for: INPUT_ID,
+    text: 'Message',
+  });
+  const input = el('input', {
+    id: INPUT_ID,
+    className: 'wpv-chat__input',
+    type: 'text',
+    placeholder: 'Type your message...',
+    disabled: true,
+  });
+  const send = el('button', {
+    type: 'submit',
+    className: 'wpv-chat__send',
+    disabled: true,
+    text: 'Send',
+  });
+  const form = el('form', { className: 'wpv-chat__form' }, [label, input, send]);
+
+  const windowEl = el('div', {
+    id: PANEL_ID,
+    className: 'wpv-chat__window',
+  }, [
+    el('header', { className: 'wpv-chat__header' }, [
+      el('h2', { className: 'wpv-chat__title', text: 'Chat with Agent' }),
+      collapse,
+    ]),
+    messages,
+    el('div', { className: 'wpv-chat__composer' }, [form]),
+  ]);
+
+  const expand = el('button', {
+    type: 'button',
+    className: 'wpv-chat__fab',
+    'aria-label': 'Open chat',
+    'aria-expanded': 'false',
+    'aria-controls': PANEL_ID,
+    'data-action': 'expand',
+  }, [svgIcon(['M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'], { size: 24 })]);
+
+  const fabWrap = el('div', { className: 'wpv-chat__fab-wrap', hidden: true }, [expand]);
+  const root = el('aside', { className: 'wpv-chat', 'aria-label': 'Chat with Agent' }, [
+    windowEl,
+    fabWrap,
+  ]);
+
+  collapse.addEventListener('click', () => setOpen(root, false));
+  expand.addEventListener('click', () => setOpen(root, true));
+  form.addEventListener('submit', (event) => event.preventDefault());
+
+  return root;
+}
+
+async function mount() {
+  if (document.getElementById(HOST_ID) || !document.body) return;
+
+  const host = document.createElement('div');
+  host.id = HOST_ID;
+  host.style.position = 'fixed';
+  host.style.bottom = '1rem';
+  host.style.right = '1rem';
+  host.style.zIndex = '1000100';
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = CHAT_MODAL_CSS;
+  shadow.appendChild(style);
+  shadow.appendChild(buildShell());
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      document.body.appendChild(host);
+      resolve();
+    });
+  });
+}
+
+function watchForEditor() {
+  const observer = new MutationObserver(() => {
+    if (document.getElementById(HOST_ID)) {
+      observer.disconnect();
+      return;
+    }
+    if (shouldMount() || editorChromePresent()) {
+      observer.disconnect();
+      mount();
+    }
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+}
+
+if (shouldMount()) {
+  mount();
+} else {
+  watchForEditor();
+}

@@ -1,0 +1,53 @@
+# WordPress Vampire
+
+Chrome extension (Manifest V3) that attaches to self-hosted WordPress admin (`/wp-admin/`) so agents can inspect the article editor session and its form fields. Immediate Media branded (IM cyan-to-royal icon). Target: Gutenberg and Classic. Not WordPress.com Calypso.
+
+## Agent skills (required)
+
+Treat `.agents/skills/` as the project plugins. Read and follow them before changing code. Do not skip.
+
+| Skill | Path | When |
+| --- | --- | --- |
+| Chrome Extensions | `.agents/skills/chrome-extensions/SKILL.md` | Any `manifest.json`, content script, service worker, popup, `chrome.*` API, or permissions change. Read the matching file in `.agents/skills/chrome-extensions/references/extensions/` first. |
+| Modern Web Guidance | `.agents/skills/modern-web-guidance/SKILL.md` | Any popup/content HTML, CSS, or clientside JS. Search then retrieve guides with `npx -y modern-web-guidance@latest` before writing UI. |
+
+`skills-lock.json` pins those skill sources. Do not invent APIs the skills forbid (Manifest V2, `.then()` chains, inline scripts, missing icon files, `<all_urls>` unless justified).
+
+## How the extension works
+
+```
+Toolbar icon click
+  → popup/popup.html
+  → chrome.tabs.query (active tab)
+  → chrome.tabs.sendMessage { type: 'GET_SESSION' }
+  → content/detect.js (injected on *://*/wp-admin/*)
+  → session + form field payload rendered in the popup
+
+Editor page (post.php / post-new.php)
+  → content/chat-modal.js (same isolated world, after detect.js)
+  → #wp-vampire-chat host + Shadow DOM
+  → CEX-look floating chat shell (visual only)
+```
+
+- **Content script** (`content/detect.js`) runs in the isolated world. It probes DOM only (no `window.wp`). On load it sends `SESSION_ATTACHED` so the service worker can paint a per-tab green status light on the toolbar icon. Other tabs stay red (disconnected). `GET_SESSION` returns attach state, editor type, post identity, REST root, and every `input` / `select` / `textarea` in the post form, Gutenberg chrome, and same-origin editor iframes.
+- **Chat overlay** (`content/chat-modal.js` + `content/chat-modal.css`) mounts only on Gutenberg/Classic. It injects a Shadow DOM shell (header, greeting bubble, disabled composer, collapse/FAB) fixed to the bottom-right. No send, transcripts, or backend. Styles are inlined into the shadow `<style>` (page-origin `fetch()` of `chrome-extension://` is blocked). Keep `CHAT_MODAL_CSS` in sync with `content/chat-modal.css`. Do not add a manifest `content_scripts.css` entry.
+- **Popup** (`popup/`) is the debug screen. No `default_popup` means `chrome.action.onClicked` would fire instead — keep the popup unless switching to a side panel (which then needs an explicit open trigger).
+- **Service worker** (`background/service-worker.js`) is stateless. No globals. It composites a green/red light onto the IM icon via `OffscreenCanvas` + `chrome.action.setIcon` (the badge API cannot draw a corner light). Persist later state in `chrome.storage`, timers in `chrome.alarms`.
+- **Permissions stay tight**: `tabs` (so `tab.url` is not silently `undefined`), `host_permissions` `*://*/wp-admin/*`. Do not add `storage` or `scripting` until a feature needs them.
+
+## Conventions
+
+- Manifest V3 only. External scripts, `addEventListener`, `async`/`await`, `return true` on async `onMessage` listeners.
+- Icons: `icons/icon-16.png` (16×16), `icon-48.png` (48×48), `icon-128.png` (128×128) must exist if referenced. Source mark is the Immediate IM circle (sky `#3AB5F4` → royal `#0B61B6`, white condensed type). Restyle popup UI to that palette; keep `color-scheme: light dark` and `light-dark()` tokens.
+- Form debug: redact password/nonce/secret/token values; truncate long values; skip submit/button/reset/image inputs. Batch DOM work with `requestAnimationFrame` and `scheduler.yield()`.
+- Popup HTML: semantic landmarks, one `h1`, no inline handlers. Scrollable regions need `tabindex="0"` and an accessible name.
+
+## Load and test
+
+1. `chrome://extensions` → Developer mode → Load unpacked → repo root.
+2. Reload the extension after code changes, then reload the WordPress tab so the content script reinjects.
+3. Open a post/page editor (`post.php` / `post-new.php`). The chat shell should appear bottom-right; the toolbar icon still opens the debug popup.
+
+## Out of scope until asked
+
+Chat send/transcripts, editor CRUD writes, WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).

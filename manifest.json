@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "WordPress Vampire",
+  "name": "Content Studio Plugin",
   "version": "0.1.0",
   "description": "Attach to a WordPress admin session and inspect the article editor from the browser.",
   "permissions": ["tabs"],
@@ -12,7 +12,7 @@
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "WordPress Vampire",
+    "default_title": "Content Studio Plugin",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
@@ -25,7 +25,7 @@
   "content_scripts": [
     {
       "matches": ["*://*/wp-admin/*"],
-      "js": ["content/detect.js"],
+      "js": ["content/detect.js", "content/chat-modal.js"],
       "run_at": "document_idle"
     }
   ]
