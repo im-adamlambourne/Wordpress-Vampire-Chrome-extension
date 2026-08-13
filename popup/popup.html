@@ -9,12 +9,31 @@
 </head>
 <body>
   <header>
-    <h1>WordPress Vampire</h1>
-    <p>Session debug</p>
+    <img src="../icons/icon-48.png" alt="Immediate Media" width="40" height="40">
+    <div>
+      <h1>WordPress Vampire</h1>
+      <p>Session debug</p>
+    </div>
   </header>
   <main>
     <p id="connection-status" role="status" aria-live="polite">Checking session…</p>
     <dl id="session-details"></dl>
+    <section id="fields-section" hidden>
+      <h2 id="fields-heading">Form elements</h2>
+      <div class="field-scroller" tabindex="0" aria-labelledby="fields-heading">
+        <table>
+          <caption id="fields-caption"></caption>
+          <thead>
+            <tr>
+              <th scope="col">Field</th>
+              <th scope="col">Type</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody id="field-rows"></tbody>
+        </table>
+      </div>
+    </section>
     <button type="button" id="refresh">Refresh</button>
   </main>
   <script src="popup.js"></script>
