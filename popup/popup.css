@@ -77,6 +77,11 @@ header {
   color: white;
 }
 
+header > div {
+  flex: 1;
+  min-width: 0;
+}
+
 header img {
   flex: none;
   width: 40px;
@@ -105,9 +110,7 @@ main {
 }
 
 #cex-auth {
-  margin: 0 0 16px;
-  padding: 0 0 14px;
-  border-block-end: 1px solid var(--color-border);
+  margin: 0;
 }
 
 #cex-status {
@@ -269,7 +272,9 @@ dd[data-empty="true"] {
   margin: 0 0 14px;
 }
 
-h2 {
+h2,
+h3,
+h4 {
   margin: 0 0 8px;
   font-size: 12px;
   font-weight: 800;
@@ -347,22 +352,25 @@ td[data-empty="true"] {
 
 button {
   appearance: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:not(.icon-button) {
   width: 100%;
   min-height: 40px;
   padding: 10px 12px;
-  border: 0;
   border-radius: 8px;
   background: var(--brand-gradient);
   color: white;
-  font: inherit;
   font-weight: 800;
   font-stretch: condensed;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  cursor: pointer;
 }
 
-button:hover {
+button:not(.icon-button):hover {
   filter: brightness(1.08);
 }
 
@@ -380,4 +388,112 @@ button.secondary {
 button.secondary:hover {
   filter: none;
   background: var(--color-status-bg);
+}
+
+.icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-inline-start: auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: white;
+}
+
+.icon-button:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+#settings-dialog {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    display 0.2s allow-discrete,
+    overlay 0.2s allow-discrete,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+#settings-dialog::backdrop {
+  background: rgb(2 34 64 / 0.45);
+}
+
+#settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  #settings-dialog[open] {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #settings-dialog {
+    transform: none;
+    transition: opacity 0.15s ease;
+  }
+
+  @starting-style {
+    #settings-dialog[open] {
+      transform: none;
+    }
+  }
+}
+
+.settings-chrome {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--brand-gradient);
+  color: white;
+}
+
+.settings-chrome h2 {
+  margin: 0;
+  flex: 1;
+  color: white;
+  font-size: 15px;
+}
+
+.settings-chrome .icon-button {
+  color: white;
+}
+
+.settings-scroller {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 16px;
+}
+
+.settings-scroller:focus-visible {
+  outline: 2px solid var(--color-sky);
+  outline-offset: -2px;
+}
+
+#debug-section {
+  margin: 16px 0 0;
+  padding: 16px 0 0;
+  border-block-start: 1px solid var(--color-border);
 }

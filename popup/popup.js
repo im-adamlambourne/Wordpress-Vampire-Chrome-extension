@@ -9,6 +9,9 @@ const hostForm = document.getElementById('cex-host-form');
 const hostInput = document.getElementById('cex-host');
 const loginBtn = document.getElementById('cex-login');
 const logoutBtn = document.getElementById('cex-logout');
+const settingsDialog = document.getElementById('settings-dialog');
+const openSettingsBtn = document.getElementById('open-settings');
+const closeSettingsBtn = document.getElementById('close-settings');
 
 let pendingPkce = null;
 
@@ -50,7 +53,7 @@ async function loadCexAuth() {
   logoutBtn.hidden = !apiToken;
 
   if (!apiHost) {
-    setCexStatus('signed-out', 'Save a server URL, then log in.');
+    setCexStatus('signed-out', 'Open settings to save a server URL, then log in.');
     return;
   }
 
@@ -320,6 +323,24 @@ async function loadSession() {
 
 refreshBtn.addEventListener('click', () => {
   loadSession();
+});
+
+function setSettingsExpanded(open) {
+  openSettingsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+openSettingsBtn.addEventListener('click', () => {
+  settingsDialog.showModal();
+  setSettingsExpanded(true);
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+  settingsDialog.close();
+});
+
+settingsDialog.addEventListener('close', () => {
+  setSettingsExpanded(false);
+  openSettingsBtn.focus();
 });
 
 loadCexAuth();
