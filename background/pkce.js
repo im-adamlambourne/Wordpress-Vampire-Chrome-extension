@@ -25,7 +25,7 @@ async function generatePkce() {
 function normalizeApiHost(value) {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) {
-    throw new Error('Enter a Content Exchange server URL.');
+    throw new Error('Enter a server URL.');
   }
 
   const withProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)

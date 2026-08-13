@@ -29,8 +29,8 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
    copy in chat-modal.js — content-script fetch of this file is blocked
    by the host page. Update both when changing styles.
 
-   Layout, motion, loader, and spinner match the Content Exchange chat
-   modal. Colour is Immediate Media cyan/royal, not CEX plum. */
+   Layout, motion, loader, and spinner match the existing chat modal.
+   Colour is Immediate Media cyan/royal. */
 
 :host {
   position: fixed;

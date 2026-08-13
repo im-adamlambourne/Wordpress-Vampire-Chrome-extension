@@ -55,12 +55,19 @@ body {
 body {
   width: 400px;
   min-height: 220px;
-  max-height: 640px;
+  max-height: 600px;
   font-family: system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.4;
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+html:has(#settings-dialog[open]),
+body:has(#settings-dialog[open]) {
+  height: 600px;
+  min-height: 600px;
+  max-height: 600px;
 }
 
 ::selection {
@@ -194,10 +201,12 @@ main {
   gap: 8px;
 }
 
+.cex-actions #cex-login[hidden],
 .cex-actions #cex-logout[hidden] {
   display: none;
 }
 
+.cex-actions:has(#cex-login[hidden]),
 .cex-actions:has(#cex-logout[hidden]) {
   grid-template-columns: 1fr;
 }
@@ -285,7 +294,7 @@ h4 {
 }
 
 .field-scroller {
-  max-height: 240px;
+  max-height: 360px;
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: 8px;

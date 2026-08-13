@@ -26,6 +26,11 @@ function setCexStatus(state, message) {
   cexStatusEl.textContent = message;
 }
 
+function syncAuthButtons(signedIn) {
+  loginBtn.hidden = signedIn;
+  logoutBtn.hidden = !signedIn;
+}
+
 function syncHostAria(event) {
   const input = event.target;
   if (input !== hostInput || !input.matches) return;
@@ -50,7 +55,7 @@ async function loadCexAuth() {
     hostInput.value = apiHost;
   }
 
-  logoutBtn.hidden = !apiToken;
+  syncAuthButtons(Boolean(apiToken));
 
   if (!apiHost) {
     setCexStatus('signed-out', 'Open settings to save a server URL, then log in.');
@@ -62,7 +67,7 @@ async function loadCexAuth() {
     return;
   }
 
-  setCexStatus('checking', 'Checking Content Exchange session…');
+  setCexStatus('checking', 'Checking session…');
 
   try {
     const response = await fetch(`${apiHost}/api/plugin/me`, {
@@ -74,7 +79,7 @@ async function loadCexAuth() {
 
     if (response.status === 401) {
       await chrome.storage.local.remove(['apiToken', 'apiUserName']);
-      logoutBtn.hidden = true;
+      syncAuthButtons(false);
       setCexStatus('signed-out', 'Session expired. Log in again.');
       return;
     }
@@ -86,10 +91,14 @@ async function loadCexAuth() {
     const user = await response.json();
     const name = user.name || user.email || 'Unknown user';
     await chrome.storage.local.set({ apiUserName: name });
-    setCexStatus('signed-in', `Signed in as ${name}`);
-    logoutBtn.hidden = false;
+    const { loginSuccessMessage } = await chrome.storage.session.get('loginSuccessMessage');
+    if (loginSuccessMessage) {
+      await chrome.storage.session.remove('loginSuccessMessage');
+    }
+    setCexStatus('signed-in', loginSuccessMessage || `Signed in as ${name}`);
+    syncAuthButtons(true);
   } catch (err) {
-    setCexStatus('error', err.message || 'Could not reach Content Exchange.');
+    setCexStatus('error', err.message || 'Could not reach the server.');
   }
 }
 
@@ -144,7 +153,7 @@ loginBtn.addEventListener('click', async () => {
   pendingPkce = null;
   refreshPkce();
 
-  setCexStatus('checking', 'Opening Content Exchange to sign in…');
+  setCexStatus('checking', 'Opening the sign-in window…');
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'PLUGIN_LOGIN',

@@ -38,7 +38,7 @@ async function sendPluginChat({ message, history, article }) {
     if (err instanceof TypeError) {
       return {
         ok: false,
-        error: 'Could not reach Content Exchange. Save the host and allow access, then try again.',
+        error: 'Could not reach the server. Save the host and allow access, then try again.',
       };
     }
     return { ok: false, error: err.message || 'Chat failed.' };

@@ -40,7 +40,7 @@ async function exchangePluginToken({ host, verifier, state, redirectUri, respons
     }
   } catch (err) {
     if (err instanceof TypeError) {
-      throw new Error('Could not reach Content Exchange. Save the host and allow access, then try again.');
+      throw new Error('Could not reach the server. Save the host and allow access, then try again.');
     }
     throw err;
   }
@@ -48,7 +48,77 @@ async function exchangePluginToken({ host, verifier, state, redirectUri, respons
   await chrome.storage.local.set({ apiHost: host, apiToken: payload.token });
   await storePluginUserName(host, payload.token);
   await chrome.storage.session.remove('pluginPkce');
+  await announceLoginSuccess();
 }
+
+const LOGIN_NOTIFICATION_ID = 'plugin-login-success';
+const POPUP_PATH = 'popup/popup.html';
+
+function loginSuccessMessage(apiUserName) {
+  return apiUserName
+    ? `Successfully logged in as ${apiUserName}.`
+    : 'Successfully logged in.';
+}
+
+async function announceLoginSuccess() {
+  const { apiUserName } = await chrome.storage.local.get('apiUserName');
+  const message = loginSuccessMessage(apiUserName);
+  await chrome.storage.session.set({ loginSuccessMessage: message });
+  await notifyLoginSuccess(message);
+  await openPluginPopup();
+}
+
+async function notifyLoginSuccess(message) {
+  try {
+    await chrome.notifications.create(LOGIN_NOTIFICATION_ID, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+      title: 'Content Studio Plugin',
+      message,
+    });
+  } catch (err) {
+    console.error('Failed to show login notification:', err);
+  }
+}
+
+async function openPluginPopup() {
+  try {
+    const lastFocused = await chrome.windows.getLastFocused();
+    if (lastFocused?.id != null && chrome.action.openPopup) {
+      await chrome.action.openPopup({ windowId: lastFocused.id });
+      return;
+    }
+  } catch (err) {
+    console.warn('Could not open the action popup after login:', err);
+  }
+
+  try {
+    const lastFocused = await chrome.windows.getLastFocused();
+    const position = typeof lastFocused?.left === 'number' && typeof lastFocused?.top === 'number'
+      ? { left: lastFocused.left + 48, top: lastFocused.top + 88 }
+      : {};
+    await chrome.windows.create({
+      url: chrome.runtime.getURL(POPUP_PATH),
+      type: 'popup',
+      focused: true,
+      width: 400,
+      height: 280,
+      ...position,
+    });
+  } catch (err) {
+    console.error('Failed to open the plugin popup after login:', err);
+  }
+}
+
+chrome.notifications.onClicked.addListener(async (notificationId) => {
+  if (notificationId !== LOGIN_NOTIFICATION_ID) return;
+  await openPluginPopup();
+  try {
+    await chrome.notifications.clear(notificationId);
+  } catch (err) {
+    console.error('Failed to clear login notification:', err);
+  }
+});
 
 async function storePluginUserName(host, token) {
   try {
@@ -71,7 +141,7 @@ async function storePluginUserName(host, token) {
 
 async function startPluginLogin({ host, verifier, challenge, state }) {
   if (!host || !verifier || !challenge || !state) {
-    throw new Error('Save a Content Exchange host, then try logging in again.');
+    throw new Error('Save a server host, then try logging in again.');
   }
 
   const redirectUri = chrome.identity.getRedirectURL();
