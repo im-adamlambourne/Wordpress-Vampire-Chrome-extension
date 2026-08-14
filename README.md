@@ -21,7 +21,7 @@ The popup (toolbar icon) is the sign-in screen. Open **Settings** (cog) to set t
 2. **Save host** and allow the origin when Chrome asks.
 3. Close Settings, then **Log in**. Chrome opens the sign-in window. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**.
 4. The popup closes during the bounce. A Chrome notification should confirm the login, and the plugin popup should reopen with **Successfully logged in as {name}**. Clicking the notification also opens the popup.
-5. If the WordPress editor is already open, the **Revision Assistant** composer enables as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with the IM circle next to **Revision Assistant**, rolling-dot thinking loader, send spinner, and a short reply sound. The greeting uses the signed-in first name and lists related images and SEO backlinks under **I can also**. A draft checklist flags missing excerpt, SEO, Open Graph, keyphrase, or a thin body. Glyph buttons above the composer are labeled Images, Backlinks, SEO, and Headlines. Messages go to `POST /api/plugin/chat` (Gemini 3.7 Flash). Replies show in the overlay. When the agent returns `edits`, the extension writes title, selected copy, body, excerpt, SEO title/description, Open Graph title/description, and focus keyphrase into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present; matching ACF standfirst/SEO text fields when the site uses Advanced Custom Fields for those boxes) and marks the draft unsaved so Save/Update and the leave-page warning work. Related images and SEO backlinks are inserted into the body the same way. Paste an http(s) URL in chat to have OpenRouter fetch the page (the extension does not fetch it). Headline ideas appear as buttons on the bubble. It does not save or publish; use WordPress Undo to revert title/body. If the WordPress host matches a Content Exchange site, house style is injected into the chat and archive image/backlink search is scoped to that site.
+5. If the WordPress editor is already open, the **Revision Assistant** composer enables as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with the IM circle next to **Revision Assistant**, rolling-dot thinking loader, send spinner, and a short reply sound. The greeting uses the signed-in first name and lists related images and SEO backlinks under **I can also**. A draft checklist flags missing excerpt, SEO, Open Graph, keyphrase, or a thin body. Glyph buttons above the composer are labeled Images, Backlinks, SEO, and Headlines. Messages go to `POST /api/plugin/chat` (Gemini 3.7 Flash). Replies show in the overlay. When the agent returns `edits`, the extension writes title, selected copy, body, excerpt, SEO title/description, Open Graph title/description, and focus keyphrase into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present; matching ACF standfirst/SEO text fields when the site uses Advanced Custom Fields for those boxes) and marks the draft unsaved so Save/Update and the leave-page warning work. Related images and SEO backlinks are inserted into the body the same way. Paste an http(s) URL in chat to have OpenRouter fetch the page (the extension does not fetch it). Headline ideas appear as buttons on the bubble. It does not save or publish; use WordPress Undo to revert title/body. If the WordPress host matches one of the signed-in user's Content Exchange sites, that site's house style is injected into the chat and archive image/backlink search is scoped to that site. If the host does not match and the user has exactly one assigned site, that site's guide is used instead.
 
 The host is stored in `chrome.storage.local` so you can point at local, staging, or production without rebuilding. Changing host clears the stored token and display name.
 
@@ -49,11 +49,20 @@ Editor chat (signed in)
   → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
   → PLUGIN_CHAT
   → service worker POST {host}/api/plugin/chat
+  → Laravel applies writing_style_guide from a matching assigned site (or the user's only site)
   → thinking loader, then { reply, edits, title_variants } in the overlay (reply sound)
   → non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data, Classic/TinyMCE, Yoast/Rank Math, and matching ACF fields)
 ```
 
 Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `popup/popup.html`, `content/chat-modal.js`, `content/editor-bridge.js`, `assets/robot.png`, `assets/chat-notification.mp3`.
+
+## Chrome Web Store (private)
+
+Staff install is a **Private** Chrome Web Store listing (not public search). Unlisted is the wrong setting: anyone with the URL could install it.
+
+Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.5.0.zip`). Host `docs/privacy-policy.html` at a public URL before you submit.
+
+After the store assigns an item ID, add `https://<item-id>.chromiumapp.org/` to the Content Studio OAuth client. Unpacked-dev and store builds use different extension IDs.
 
 ## Permissions
 
@@ -67,4 +76,4 @@ Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-cha
 
 ## Out of scope until asked
 
-Save/publish, taxonomies, featured image, Open Graph image, custom meta (other than SEO/Open Graph text fields, focus keyphrase, and matching ACF text fields for those plus excerpt/standfirst), WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
+Save/publish, taxonomies, featured image, Open Graph image, custom meta (other than SEO/Open Graph text fields, focus keyphrase, and matching ACF text fields for those plus excerpt/standfirst), WordPress.com.
