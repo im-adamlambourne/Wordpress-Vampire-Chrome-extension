@@ -932,7 +932,7 @@ function signInGate({ hidden = false } = {}) {
     text: 'Sign in',
   });
   const copy = el('p', { className: 'wpv-chat__signin-copy' });
-  copy.append(link, ' to chat about this draft.');
+  copy.append(link, ' to use assistant.');
   const status = el('p', {
     className: 'wpv-chat__signin-status',
     role: 'status',
