@@ -38,7 +38,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/robot.png", "assets/chat-notification.mp3"],
+      "resources": ["assets/robot.png", "assets/chat-notification.mp3", "icons/icon-48.png"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]

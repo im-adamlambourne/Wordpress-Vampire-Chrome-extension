@@ -110,10 +110,26 @@
 }
 
 .wpv-chat__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
+}
+
+.wpv-chat__logo {
+  flex: none;
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+}
+
+.wpv-chat__title-text {
+  text-box: trim-both cap alphabetic;
 }
 
 .wpv-chat__icon-button {
@@ -564,25 +580,27 @@
 
 .wpv-chat__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .wpv-chat__chip {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.45rem 0 0.35rem;
   border: 1px solid var(--ws-hairline);
-  border-radius: 0.55rem;
+  border-radius: 0.45rem;
   background: var(--ws-well-4);
-  color: #a5b4fc;
+  color: #e5e7eb;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
-  interest-delay: 0.15s 0.1s;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,
@@ -593,6 +611,11 @@
 .wpv-chat__chip:focus-visible {
   background: var(--ws-well-5);
   border-color: rgb(58 181 244 / 0.45);
+  color: #fff;
+}
+
+.wpv-chat__chip:hover:not(:disabled) .wpv-chat__chip-icon,
+.wpv-chat__chip:focus-visible .wpv-chat__chip-icon {
   color: #3ab5f4;
 }
 
@@ -607,58 +630,14 @@
 }
 
 .wpv-chat__chip-icon {
-  width: 1.05rem;
-  height: 1.05rem;
+  flex-shrink: 0;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: #a5b4fc;
 }
 
-.wpv-chat__tooltip {
-  position: absolute;
-  inset: auto;
-  box-sizing: border-box;
-  width: max-content;
-  max-width: 12.5rem;
-  height: fit-content;
-  margin: 0 0 0.4rem;
-  padding: 0.35rem 0.55rem;
-  overflow: visible;
-  border: 1px solid var(--ws-hairline);
-  border-radius: 0.4rem;
-  background: #011627;
-  color: #f3f4f6;
-  font: 0.7rem / 1.35 system-ui, sans-serif;
-  letter-spacing: 0.01em;
-  text-wrap: balance;
-  box-shadow: 0 10px 24px rgb(0 0 0 / 0.4);
-  position-area: block-start;
-  justify-self: anchor-center;
-  position-try: flip-block;
-  opacity: 0;
-  transition:
-    display 0.12s ease allow-discrete,
-    overlay 0.12s ease allow-discrete,
-    opacity 0.12s ease;
-}
-
-.wpv-chat__tooltip:is(:popover-open, .\:popover-open) {
-  display: block;
-  opacity: 1;
-
-  @starting-style {
-    opacity: 0;
-  }
-}
-
-.wpv-chat__tooltip::after {
-  content: "";
-  position: absolute;
-  top: calc(100% - 0.22rem);
-  left: 50%;
-  width: 0.45rem;
-  height: 0.45rem;
-  background: inherit;
-  border-right: inherit;
-  border-bottom: inherit;
-  transform: translateX(-50%) rotate(45deg);
+.wpv-chat__chip-label {
+  text-box: trim-both cap alphabetic;
 }
 
 .wpv-chat__variants {
@@ -716,8 +695,7 @@
     opacity: 0.7;
   }
 
-  .wpv-chat__chip,
-  .wpv-chat__tooltip {
+  .wpv-chat__chip {
     transition-duration: 0.05s;
   }
 }

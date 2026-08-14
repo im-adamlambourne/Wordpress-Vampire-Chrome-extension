@@ -34,34 +34,10 @@ const GREETING_ITEMS = [
   { icon: 'link', label: SEO_BACKLINKS_PROMPT, prompt: SEO_BACKLINKS_PROMPT },
 ];
 const QUICK_ACTIONS = [
-  {
-    id: 'images',
-    icon: 'photo',
-    label: 'Related images',
-    hint: 'Find related images from the archive',
-    prompt: RELATED_IMAGES_PROMPT,
-  },
-  {
-    id: 'backlinks',
-    icon: 'link',
-    label: 'SEO backlinks',
-    hint: 'Insert internal SEO backlinks',
-    prompt: SEO_BACKLINKS_PROMPT,
-  },
-  {
-    id: 'seo',
-    icon: 'search',
-    label: 'SEO pack',
-    hint: 'Write excerpt, SEO, and Open Graph',
-    prompt: SEO_PACK_PROMPT,
-  },
-  {
-    id: 'headlines',
-    icon: 'sparkles',
-    label: 'Headline ideas',
-    hint: 'Suggest alternative headlines',
-    prompt: HEADLINES_PROMPT,
-  },
+  { icon: 'photo', label: 'Images', prompt: RELATED_IMAGES_PROMPT },
+  { icon: 'link', label: 'Backlinks', prompt: SEO_BACKLINKS_PROMPT },
+  { icon: 'search', label: 'SEO', prompt: SEO_PACK_PROMPT },
+  { icon: 'sparkles', label: 'Headlines', prompt: HEADLINES_PROMPT },
 ];
 const ICON_PATHS = {
   photo: 'm2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z',
@@ -185,10 +161,26 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
+}
+
+.wpv-chat__logo {
+  flex: none;
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+}
+
+.wpv-chat__title-text {
+  text-box: trim-both cap alphabetic;
 }
 
 .wpv-chat__icon-button {
@@ -639,25 +631,27 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 
 .wpv-chat__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .wpv-chat__chip {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.45rem 0 0.35rem;
   border: 1px solid var(--ws-hairline);
-  border-radius: 0.55rem;
+  border-radius: 0.45rem;
   background: var(--ws-well-4);
-  color: #a5b4fc;
+  color: #e5e7eb;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
-  interest-delay: 0.15s 0.1s;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,
@@ -668,6 +662,11 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 .wpv-chat__chip:focus-visible {
   background: var(--ws-well-5);
   border-color: rgb(58 181 244 / 0.45);
+  color: #fff;
+}
+
+.wpv-chat__chip:hover:not(:disabled) .wpv-chat__chip-icon,
+.wpv-chat__chip:focus-visible .wpv-chat__chip-icon {
   color: #3ab5f4;
 }
 
@@ -682,58 +681,14 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__chip-icon {
-  width: 1.05rem;
-  height: 1.05rem;
+  flex-shrink: 0;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: #a5b4fc;
 }
 
-.wpv-chat__tooltip {
-  position: absolute;
-  inset: auto;
-  box-sizing: border-box;
-  width: max-content;
-  max-width: 12.5rem;
-  height: fit-content;
-  margin: 0 0 0.4rem;
-  padding: 0.35rem 0.55rem;
-  overflow: visible;
-  border: 1px solid var(--ws-hairline);
-  border-radius: 0.4rem;
-  background: #011627;
-  color: #f3f4f6;
-  font: 0.7rem / 1.35 system-ui, sans-serif;
-  letter-spacing: 0.01em;
-  text-wrap: balance;
-  box-shadow: 0 10px 24px rgb(0 0 0 / 0.4);
-  position-area: block-start;
-  justify-self: anchor-center;
-  position-try: flip-block;
-  opacity: 0;
-  transition:
-    display 0.12s ease allow-discrete,
-    overlay 0.12s ease allow-discrete,
-    opacity 0.12s ease;
-}
-
-.wpv-chat__tooltip:is(:popover-open, .\:popover-open) {
-  display: block;
-  opacity: 1;
-
-  @starting-style {
-    opacity: 0;
-  }
-}
-
-.wpv-chat__tooltip::after {
-  content: "";
-  position: absolute;
-  top: calc(100% - 0.22rem);
-  left: 50%;
-  width: 0.45rem;
-  height: 0.45rem;
-  background: inherit;
-  border-right: inherit;
-  border-bottom: inherit;
-  transform: translateX(-50%) rotate(45deg);
+.wpv-chat__chip-label {
+  text-box: trim-both cap alphabetic;
 }
 
 .wpv-chat__variants {
@@ -791,8 +746,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
     opacity: 0.7;
   }
 
-  .wpv-chat__chip,
-  .wpv-chat__tooltip {
+  .wpv-chat__chip {
     transition-duration: 0.05s;
   }
 }
@@ -861,69 +815,15 @@ function greetingIcon(name) {
 }
 
 function quickAction(action) {
-  const chipId = `wpv-chip-${action.id}`;
-  const tipId = `wpv-tip-${action.id}`;
-  const anchor = `--${chipId}`;
-  const chip = el('button', {
+  return el('button', {
     type: 'button',
-    id: chipId,
     className: 'wpv-chat__chip',
-    'aria-label': action.label,
-    interestfor: tipId,
     'data-quick-prompt': action.prompt,
     disabled: true,
-  }, [strokeIcon(action.icon, 'wpv-chat__chip-icon')]);
-  chip.style.setProperty('anchor-name', anchor);
-
-  const tooltip = el('div', {
-    id: tipId,
-    className: 'wpv-chat__tooltip',
-    popover: 'hint',
-    text: action.hint,
-  });
-  tooltip.style.setProperty('position-anchor', anchor);
-
-  return [chip, tooltip];
-}
-
-function bindChipTooltipFallback(root) {
-  const sample = root.querySelector('.wpv-chat__chip');
-  if (sample && 'interestForElement' in HTMLButtonElement.prototype && sample.interestForElement) {
-    return;
-  }
-
-  for (const chip of root.querySelectorAll('.wpv-chat__chip')) {
-    const tipId = chip.getAttribute('interestfor');
-    const tip = tipId ? root.querySelector(`#${CSS.escape(tipId)}`) : null;
-    if (!tip || typeof tip.showPopover !== 'function') continue;
-
-    let hideTimer = 0;
-    const show = () => {
-      if (chip.disabled) return;
-      window.clearTimeout(hideTimer);
-      try {
-        tip.showPopover();
-      } catch {
-        // Already open.
-      }
-    };
-    const hide = () => {
-      hideTimer = window.setTimeout(() => {
-        try {
-          tip.hidePopover();
-        } catch {
-          // Already closed.
-        }
-      }, 80);
-    };
-
-    chip.addEventListener('pointerenter', show);
-    chip.addEventListener('pointerleave', hide);
-    chip.addEventListener('focus', show);
-    chip.addEventListener('blur', hide);
-    tip.addEventListener('pointerenter', show);
-    tip.addEventListener('pointerleave', hide);
-  }
+  }, [
+    strokeIcon(action.icon, 'wpv-chat__chip-icon'),
+    el('span', { className: 'wpv-chat__chip-label', text: action.label }),
+  ]);
 }
 
 function greetingItem(item) {
@@ -992,6 +892,16 @@ function robotAvatar() {
   img.alt = 'Agent';
   img.width = 28;
   img.height = 28;
+  return img;
+}
+
+function brandLogo() {
+  const img = document.createElement('img');
+  img.className = 'wpv-chat__logo';
+  img.src = chrome.runtime.getURL('icons/icon-48.png');
+  img.alt = '';
+  img.width = 24;
+  img.height = 24;
   return img;
 }
 
@@ -1636,7 +1546,6 @@ function bindComposer(root, initialAuth = {}) {
       sendUserMessage(chip.getAttribute('data-quick-prompt'));
     });
   }
-  bindChipTooltipFallback(root);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
@@ -1726,7 +1635,7 @@ function buildShell(auth = {}) {
       className: 'wpv-chat__actions',
       role: 'group',
       'aria-label': 'Quick actions',
-    }, QUICK_ACTIONS.flatMap(quickAction)),
+    }, QUICK_ACTIONS.map(quickAction)),
   ]);
 
   const checklist = el('details', { className: 'wpv-chat__checklist' }, [
@@ -1742,7 +1651,10 @@ function buildShell(auth = {}) {
     className: 'wpv-chat__window',
   }, [
     el('header', { className: 'wpv-chat__header' }, [
-      el('h2', { className: 'wpv-chat__title', text: CHAT_TITLE }),
+      el('h2', { className: 'wpv-chat__title' }, [
+        brandLogo(),
+        el('span', { className: 'wpv-chat__title-text', text: CHAT_TITLE }),
+      ]),
       collapse,
     ]),
     checklist,
