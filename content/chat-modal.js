@@ -1,9 +1,12 @@
 const HOST_ID = 'wp-vampire-chat';
 const PANEL_ID = 'wpv-chat-panel';
 const INPUT_ID = 'wpv-chat-input';
-const GREETING = 'I can help with this article. Ask me to review or rewrite the draft, excerpt, SEO, or Open Graph fields — or use SEO pack and Headline ideas below.';
+const CHAT_TITLE = 'Revision Assistant';
+const GREETING_HI = 'Hi! 👋';
+const GREETING_BODY = "I'm your revision assistant. Tell me what you'd like to change: reword a section, tighten the intro, or refresh the headline, and I'll update the article for you.";
+const GREETING_ITEMS_LABEL = 'I can also';
 const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
-const SIGNED_IN_PLACEHOLDER = 'Type your message...';
+const SIGNED_IN_PLACEHOLDER = 'What should change?';
 const DEFAULT_USER_NAME = 'User';
 const MAX_HISTORY = 20;
 const EDITOR_COMMAND_EVENT = 'wpv-editor';
@@ -24,17 +27,47 @@ const EDIT_KEYS = [
 ];
 const SEO_PACK_PROMPT = 'Write the excerpt, SEO title, SEO description, Open Graph title, Open Graph description, and focus keyphrase from this draft. Do not change the post title or body.';
 const HEADLINES_PROMPT = 'Suggest 5 alternative headlines for this draft. Do not change the draft yet.';
-const FIELD_LABELS = {
-  title: 'Title',
-  body: 'Body',
-  content: 'Body',
-  selection: 'Selected copy',
-  excerpt: 'Excerpt',
-  seo_title: 'SEO title',
-  seo_description: 'SEO description',
-  og_title: 'Open Graph title',
-  og_description: 'Open Graph description',
-  focus_keyphrase: 'Focus keyphrase',
+const RELATED_IMAGES_PROMPT = 'Find related images from our archive to add to the article';
+const SEO_BACKLINKS_PROMPT = 'Find SEO-friendly backlinks to related articles in our archive';
+const GREETING_ITEMS = [
+  { icon: 'photo', label: RELATED_IMAGES_PROMPT, prompt: RELATED_IMAGES_PROMPT },
+  { icon: 'link', label: SEO_BACKLINKS_PROMPT, prompt: SEO_BACKLINKS_PROMPT },
+];
+const QUICK_ACTIONS = [
+  {
+    id: 'images',
+    icon: 'photo',
+    label: 'Related images',
+    hint: 'Find related images from the archive',
+    prompt: RELATED_IMAGES_PROMPT,
+  },
+  {
+    id: 'backlinks',
+    icon: 'link',
+    label: 'SEO backlinks',
+    hint: 'Insert internal SEO backlinks',
+    prompt: SEO_BACKLINKS_PROMPT,
+  },
+  {
+    id: 'seo',
+    icon: 'search',
+    label: 'SEO pack',
+    hint: 'Write excerpt, SEO, and Open Graph',
+    prompt: SEO_PACK_PROMPT,
+  },
+  {
+    id: 'headlines',
+    icon: 'sparkles',
+    label: 'Headline ideas',
+    hint: 'Suggest alternative headlines',
+    prompt: HEADLINES_PROMPT,
+  },
+];
+const ICON_PATHS = {
+  photo: 'm2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z',
+  link: 'M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244',
+  search: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z',
+  sparkles: 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z',
 };
 
 // Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
@@ -242,7 +275,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   border-radius: 0.75rem 0 0.75rem 0.75rem;
 }
 
-.wpv-chat__row--user .wpv-chat__bubble p {
+.wpv-chat__row--user .wpv-chat__bubble > p {
   color: #fff;
 }
 
@@ -250,7 +283,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   background: #7f1d1d;
 }
 
-.wpv-chat__bubble p {
+.wpv-chat__bubble > p {
   margin: 0;
   font-size: 0.875rem;
   font-weight: 400;
@@ -258,8 +291,77 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   overflow-wrap: anywhere;
 }
 
-.wpv-chat__bubble--greeting p {
+.wpv-chat__bubble--greeting > p {
   line-height: 1.625;
+}
+
+.wpv-chat__greeting-items {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.wpv-chat__greeting-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.wpv-chat__greeting-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wpv-chat__greeting-item {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #e5e7eb;
+  overflow-wrap: anywhere;
+}
+
+.wpv-chat__greeting-item + .wpv-chat__greeting-item {
+  margin-top: 0.375rem;
+}
+
+.wpv-chat__greeting-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpv-chat__greeting-action:hover:not(:disabled) {
+  color: #fff;
+}
+
+.wpv-chat__greeting-action:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.wpv-chat__greeting-action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.wpv-chat__greeting-icon {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: #a5b4fc;
 }
 
 .wpv-chat__bubble .wpv-chat__status {
@@ -537,25 +639,36 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 
 .wpv-chat__actions {
   display: flex;
+  align-items: center;
   gap: 0.35rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .wpv-chat__chip {
   flex-shrink: 0;
-  padding: 0.25rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   border: 1px solid var(--ws-hairline);
-  border-radius: 999px;
+  border-radius: 0.55rem;
   background: var(--ws-well-4);
-  color: #fff;
-  font: inherit;
-  font-size: 0.75rem;
+  color: #a5b4fc;
   cursor: pointer;
+  user-select: none;
+  interest-delay: 0.15s 0.1s;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.wpv-chat__chip:hover:not(:disabled) {
+.wpv-chat__chip:hover:not(:disabled),
+.wpv-chat__chip:focus-visible {
   background: var(--ws-well-5);
+  border-color: rgb(58 181 244 / 0.45);
+  color: #3ab5f4;
 }
 
 .wpv-chat__chip:disabled {
@@ -566,6 +679,61 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 .wpv-chat__chip:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+.wpv-chat__chip-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.wpv-chat__tooltip {
+  position: absolute;
+  inset: auto;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 12.5rem;
+  height: fit-content;
+  margin: 0 0 0.4rem;
+  padding: 0.35rem 0.55rem;
+  overflow: visible;
+  border: 1px solid var(--ws-hairline);
+  border-radius: 0.4rem;
+  background: #011627;
+  color: #f3f4f6;
+  font: 0.7rem / 1.35 system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.4);
+  position-area: block-start;
+  justify-self: anchor-center;
+  position-try: flip-block;
+  opacity: 0;
+  transition:
+    display 0.12s ease allow-discrete,
+    overlay 0.12s ease allow-discrete,
+    opacity 0.12s ease;
+}
+
+.wpv-chat__tooltip:is(:popover-open, .\:popover-open) {
+  display: block;
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.wpv-chat__tooltip::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - 0.22rem);
+  left: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  background: inherit;
+  border-right: inherit;
+  border-bottom: inherit;
+  transform: translateX(-50%) rotate(45deg);
 }
 
 .wpv-chat__variants {
@@ -589,90 +757,6 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 
 .wpv-chat__variant:hover:not(:disabled) {
   background: var(--ws-well-5);
-}
-
-.wpv-chat__diff {
-  width: min(20rem, calc(100vw - 2rem));
-  max-height: min(28rem, 80vh);
-  padding: 0;
-  border: 1px solid var(--window-border);
-  border-radius: 0.75rem;
-  background: #0b1220;
-  color: var(--text);
-}
-
-.wpv-chat__diff::backdrop {
-  background: rgb(2 12 27 / 0.55);
-}
-
-.wpv-chat__diff-form {
-  display: flex;
-  flex-direction: column;
-  max-height: min(28rem, 80vh);
-}
-
-.wpv-chat__diff-form h3 {
-  margin: 0;
-  padding: 0.85rem 1rem 0.4rem;
-  font-size: 0.95rem;
-}
-
-.wpv-chat__diff-body {
-  overflow-y: auto;
-  padding: 0 1rem 0.75rem;
-}
-
-.wpv-chat__diff-row + .wpv-chat__diff-row {
-  margin-top: 0.65rem;
-}
-
-.wpv-chat__diff-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.wpv-chat__diff-old,
-.wpv-chat__diff-new {
-  margin: 0.15rem 0 0;
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
-}
-
-.wpv-chat__diff-old {
-  color: #fca5a5;
-  text-decoration: line-through;
-}
-
-.wpv-chat__diff-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--ws-hairline);
-}
-
-.wpv-chat__diff-cancel,
-.wpv-chat__diff-apply {
-  padding: 0.4rem 0.75rem;
-  border: 0;
-  border-radius: 0.5rem;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.wpv-chat__diff-cancel {
-  background: transparent;
-  color: var(--text-muted);
-}
-
-.wpv-chat__diff-apply {
-  background: var(--brand-600);
-  color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -706,7 +790,13 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
     animation: none;
     opacity: 0.7;
   }
-}`;
+
+  .wpv-chat__chip,
+  .wpv-chat__tooltip {
+    transition-duration: 0.05s;
+  }
+}
+`;
 
 function isEditorPath() {
   const file = location.pathname.split('/').pop() || '';
@@ -747,6 +837,128 @@ function svgIcon(paths, { size = 24, strokeWidth = 2 } = {}) {
   }
 
   return svg;
+}
+
+function firstName(name) {
+  return String(name || '').trim().split(/\s+/, 1)[0] || '';
+}
+
+function greetingText(rawUserName) {
+  const name = firstName(rawUserName);
+  const hi = name ? `Hi ${name}! 👋` : GREETING_HI;
+  return `${hi} ${GREETING_BODY}`;
+}
+
+function strokeIcon(name, className) {
+  const d = ICON_PATHS[name] || ICON_PATHS.sparkles;
+  const svg = svgIcon([d], { size: 16, strokeWidth: 1.5 });
+  svg.setAttribute('class', className);
+  return svg;
+}
+
+function greetingIcon(name) {
+  return strokeIcon(name, 'wpv-chat__greeting-icon');
+}
+
+function quickAction(action) {
+  const chipId = `wpv-chip-${action.id}`;
+  const tipId = `wpv-tip-${action.id}`;
+  const anchor = `--${chipId}`;
+  const chip = el('button', {
+    type: 'button',
+    id: chipId,
+    className: 'wpv-chat__chip',
+    'aria-label': action.label,
+    interestfor: tipId,
+    'data-quick-prompt': action.prompt,
+    disabled: true,
+  }, [strokeIcon(action.icon, 'wpv-chat__chip-icon')]);
+  chip.style.setProperty('anchor-name', anchor);
+
+  const tooltip = el('div', {
+    id: tipId,
+    className: 'wpv-chat__tooltip',
+    popover: 'hint',
+    text: action.hint,
+  });
+  tooltip.style.setProperty('position-anchor', anchor);
+
+  return [chip, tooltip];
+}
+
+function bindChipTooltipFallback(root) {
+  const sample = root.querySelector('.wpv-chat__chip');
+  if (sample && 'interestForElement' in HTMLButtonElement.prototype && sample.interestForElement) {
+    return;
+  }
+
+  for (const chip of root.querySelectorAll('.wpv-chat__chip')) {
+    const tipId = chip.getAttribute('interestfor');
+    const tip = tipId ? root.querySelector(`#${CSS.escape(tipId)}`) : null;
+    if (!tip || typeof tip.showPopover !== 'function') continue;
+
+    let hideTimer = 0;
+    const show = () => {
+      if (chip.disabled) return;
+      window.clearTimeout(hideTimer);
+      try {
+        tip.showPopover();
+      } catch {
+        // Already open.
+      }
+    };
+    const hide = () => {
+      hideTimer = window.setTimeout(() => {
+        try {
+          tip.hidePopover();
+        } catch {
+          // Already closed.
+        }
+      }, 80);
+    };
+
+    chip.addEventListener('pointerenter', show);
+    chip.addEventListener('pointerleave', hide);
+    chip.addEventListener('focus', show);
+    chip.addEventListener('blur', hide);
+    tip.addEventListener('pointerenter', show);
+    tip.addEventListener('pointerleave', hide);
+  }
+}
+
+function greetingItem(item) {
+  return el('li', { className: 'wpv-chat__greeting-item' }, [
+    el('button', {
+      type: 'button',
+      className: 'wpv-chat__greeting-action',
+      'data-quick-prompt': item.prompt,
+      disabled: true,
+    }, [
+      greetingIcon(item.icon),
+      el('span', { text: item.label }),
+    ]),
+  ]);
+}
+
+function greetingRow(rawUserName) {
+  return el('li', {
+    className: 'wpv-chat__row',
+    'data-greeting': '',
+  }, [
+    robotAvatar(),
+    el('div', { className: 'wpv-chat__bubble wpv-chat__bubble--greeting' }, [
+      el('p', { 'data-greeting-text': '', text: greetingText(rawUserName) }),
+      el('div', { className: 'wpv-chat__greeting-items' }, [
+        el('p', { className: 'wpv-chat__greeting-label', text: GREETING_ITEMS_LABEL }),
+        el('ul', { className: 'wpv-chat__greeting-list' }, GREETING_ITEMS.map(greetingItem)),
+      ]),
+    ]),
+  ]);
+}
+
+function updateGreeting(root, rawUserName) {
+  const text = root.querySelector('[data-greeting-text]');
+  if (text) text.textContent = greetingText(rawUserName);
 }
 
 function sendSpinner() {
@@ -975,12 +1187,6 @@ function hasSelection(article) {
   const selection = article?.selection;
   if (!selection || typeof selection !== 'object') return false;
   return String(selection.html || '').trim() !== '' || String(selection.text || '').trim() !== '';
-}
-
-function previewText(value, max = 140) {
-  const text = plainText(value);
-  if (text.length <= max) return text || '(empty)';
-  return `${text.slice(0, max)}…`;
 }
 
 function checklistItems(article) {
@@ -1242,48 +1448,13 @@ function setComposerEnabled(root, { signedIn, busy }) {
   form.setAttribute('aria-busy', busy ? 'true' : 'false');
   label.hidden = busy;
   spinner.hidden = !busy;
-  for (const control of root.querySelectorAll('.wpv-chat__chip, .wpv-chat__variant')) {
+  for (const control of root.querySelectorAll('.wpv-chat__chip, .wpv-chat__variant, .wpv-chat__greeting-action')) {
     control.disabled = disabled;
   }
 
   if (disabled) {
     input.removeAttribute('aria-invalid');
   }
-}
-
-function currentValueForDiff(article, key) {
-  if (key === 'selection') {
-    return article?.selection?.html || article?.selection?.text || '';
-  }
-  if (key === 'content') return article?.content || '';
-  return article?.[key] || '';
-}
-
-function diffRows(article, edits) {
-  const rows = [];
-  for (const key of EDIT_KEYS) {
-    if (typeof edits[key] !== 'string' || edits[key].trim() === '') continue;
-    rows.push(el('div', { className: 'wpv-chat__diff-row' }, [
-      el('div', { className: 'wpv-chat__diff-label', text: FIELD_LABELS[key] || key }),
-      el('p', { className: 'wpv-chat__diff-old', text: previewText(currentValueForDiff(article, key)) }),
-      el('p', { className: 'wpv-chat__diff-new', text: previewText(edits[key]) }),
-    ]));
-  }
-  return rows;
-}
-
-function confirmEdits(root, article, edits) {
-  const dialog = root.querySelector('.wpv-chat__diff');
-  const body = dialog.querySelector('.wpv-chat__diff-body');
-  body.replaceChildren(...diffRows(article, edits));
-  return new Promise((resolve) => {
-    const onClose = () => {
-      dialog.removeEventListener('close', onClose);
-      resolve(dialog.returnValue === 'apply');
-    };
-    dialog.addEventListener('close', onClose);
-    dialog.showModal();
-  });
 }
 
 function renderChecklist(root, article, { signedIn, busy, onFix }) {
@@ -1325,15 +1496,20 @@ function displayName(value) {
     : DEFAULT_USER_NAME;
 }
 
+function rawUserName(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 async function readAuthState() {
   const { apiToken, apiUserName } = await chrome.storage.local.get(AUTH_KEYS);
   return {
     signedIn: typeof apiToken === 'string' && apiToken.length > 0,
     userName: displayName(apiUserName),
+    rawUserName: rawUserName(apiUserName),
   };
 }
 
-function bindComposer(root) {
+function bindComposer(root, initialAuth = {}) {
   const form = root.querySelector('.wpv-chat__form');
   const input = root.querySelector(`#${INPUT_ID}`);
   const messages = root.querySelector('.wpv-chat__messages');
@@ -1344,10 +1520,13 @@ function bindComposer(root) {
     signedIn: false,
     busy: false,
     userName: DEFAULT_USER_NAME,
+    rawUserName: '',
     lastArticle: null,
+    ...initialAuth,
   };
 
   const refreshComposer = () => setComposerEnabled(root, state);
+  refreshComposer();
 
   async function refreshEditorChrome() {
     const article = await articleSnapshot();
@@ -1360,11 +1539,7 @@ function bindComposer(root) {
     updateSelectionHint(root, article);
   }
 
-  async function applyConfirmedEdits(edits, article) {
-    const accepted = await confirmEdits(root, article, edits);
-    if (!accepted) {
-      return { status: 'Edits not applied.', statusError: false };
-    }
+  async function applyReturnedEdits(edits, article) {
     const applied = await applyEditorEdits(edits, { selection: article?.selection });
     await refreshEditorChrome();
     return applied;
@@ -1410,7 +1585,7 @@ function bindComposer(root) {
       let status = '';
       let statusError = false;
       if (hasEdits(result.edits)) {
-        const applied = await applyConfirmedEdits(result.edits, article);
+        const applied = await applyReturnedEdits(result.edits, article);
         status = applied.status;
         statusError = applied.statusError;
       }
@@ -1420,7 +1595,7 @@ function bindComposer(root) {
         status,
         statusError,
         variants: result.title_variants || [],
-        onPickVariant: (title) => applyConfirmedEdits({ title }, state.lastArticle || article),
+        onPickVariant: (title) => applyReturnedEdits({ title }, state.lastArticle || article),
       });
       playReplySound(replySound);
     } else {
@@ -1461,6 +1636,7 @@ function bindComposer(root) {
       sendUserMessage(chip.getAttribute('data-quick-prompt'));
     });
   }
+  bindChipTooltipFallback(root);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
@@ -1470,6 +1646,8 @@ function bindComposer(root) {
     }
     if (changes.apiUserName) {
       state.userName = displayName(changes.apiUserName.newValue);
+      state.rawUserName = rawUserName(changes.apiUserName.newValue);
+      updateGreeting(root, state.rawUserName);
     }
     if (changes.apiToken || changes.apiUserName) refreshComposer();
   });
@@ -1480,12 +1658,13 @@ function bindComposer(root) {
 
   (async () => {
     Object.assign(state, await readAuthState());
+    updateGreeting(root, state.rawUserName);
     refreshComposer();
     await refreshEditorChrome();
   })();
 }
 
-function buildShell() {
+function buildShell(auth = {}) {
   const collapse = el('button', {
     type: 'button',
     className: 'wpv-chat__icon-button',
@@ -1495,7 +1674,6 @@ function buildShell() {
     'data-action': 'collapse',
   }, [svgIcon(['M19 9l-7 7-7-7'], { size: 24 })]);
 
-  const greeting = el('p', { text: GREETING });
   const messages = el('ul', {
     className: 'wpv-chat__messages',
     tabindex: '0',
@@ -1504,10 +1682,7 @@ function buildShell() {
     'aria-relevant': 'additions',
     role: 'list',
   }, [
-    el('li', { className: 'wpv-chat__row' }, [
-      robotAvatar(),
-      el('div', { className: 'wpv-chat__bubble wpv-chat__bubble--greeting' }, [greeting]),
-    ]),
+    greetingRow(auth.rawUserName || ''),
   ]);
 
   const label = el('label', {
@@ -1545,27 +1720,13 @@ function buildShell() {
     hidden: true,
     text: 'Rewriting the selected copy, not the whole article.',
   });
-  const seoChip = el('button', {
-    type: 'button',
-    className: 'wpv-chat__chip',
-    'data-quick-prompt': SEO_PACK_PROMPT,
-    text: 'SEO pack',
-    disabled: true,
-  });
-  const headlinesChip = el('button', {
-    type: 'button',
-    className: 'wpv-chat__chip',
-    'data-quick-prompt': HEADLINES_PROMPT,
-    text: 'Headline ideas',
-    disabled: true,
-  });
   const tools = el('div', { className: 'wpv-chat__composer-tools' }, [
     hint,
     el('div', {
       className: 'wpv-chat__actions',
       role: 'group',
       'aria-label': 'Quick actions',
-    }, [seoChip, headlinesChip]),
+    }, QUICK_ACTIONS.flatMap(quickAction)),
   ]);
 
   const checklist = el('details', { className: 'wpv-chat__checklist' }, [
@@ -1576,36 +1737,12 @@ function buildShell() {
     el('ul', { className: 'wpv-chat__checklist-items' }),
   ]);
 
-  const diff = el('dialog', {
-    className: 'wpv-chat__diff',
-    'aria-labelledby': 'wpv-chat-diff-title',
-  }, [
-    el('form', { method: 'dialog', className: 'wpv-chat__diff-form' }, [
-      el('h3', { id: 'wpv-chat-diff-title', text: 'Apply these edits?' }),
-      el('div', { className: 'wpv-chat__diff-body' }),
-      el('div', { className: 'wpv-chat__diff-actions' }, [
-        el('button', {
-          type: 'submit',
-          value: 'cancel',
-          className: 'wpv-chat__diff-cancel',
-          text: 'Don’t apply',
-        }),
-        el('button', {
-          type: 'submit',
-          value: 'apply',
-          className: 'wpv-chat__diff-apply',
-          text: 'Apply',
-        }),
-      ]),
-    ]),
-  ]);
-
   const windowEl = el('div', {
     id: PANEL_ID,
     className: 'wpv-chat__window',
   }, [
     el('header', { className: 'wpv-chat__header' }, [
-      el('h2', { className: 'wpv-chat__title', text: 'Chat with Agent' }),
+      el('h2', { className: 'wpv-chat__title', text: CHAT_TITLE }),
       collapse,
     ]),
     checklist,
@@ -1623,15 +1760,14 @@ function buildShell() {
   }, [svgIcon(['M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'], { size: 24 })]);
 
   const fabWrap = el('div', { className: 'wpv-chat__fab-wrap' }, [expand]);
-  const root = el('aside', { className: 'wpv-chat', 'aria-label': 'Chat with Agent' }, [
+  const root = el('aside', { className: 'wpv-chat', 'aria-label': CHAT_TITLE }, [
     windowEl,
     fabWrap,
-    diff,
   ]);
 
   collapse.addEventListener('click', () => setOpen(root, false));
   expand.addEventListener('click', () => setOpen(root, true));
-  bindComposer(root);
+  bindComposer(root, auth);
 
   return root;
 }
@@ -1650,7 +1786,8 @@ async function mount() {
   const style = document.createElement('style');
   style.textContent = CHAT_MODAL_CSS;
   shadow.appendChild(style);
-  const root = buildShell();
+  const auth = await readAuthState();
+  const root = buildShell(auth);
   shadow.appendChild(root);
 
   await new Promise((resolve) => {
