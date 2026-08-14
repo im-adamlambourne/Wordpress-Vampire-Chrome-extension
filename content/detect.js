@@ -93,6 +93,7 @@ function detectSeoSnapshot() {
       'yoast_wpseo_opengraph-description',
       'rank_math_facebook_description',
     ]),
+    focus_keyphrase: detectNamedValue(['yoast_wpseo_focuskw', 'rank_math_focus_keyword']),
   };
 }
 

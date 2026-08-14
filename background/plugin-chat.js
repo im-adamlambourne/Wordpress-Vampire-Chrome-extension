@@ -44,7 +44,15 @@ async function sendPluginChat({ message, history, article }) {
     return { ok: false, error: err.message || 'Chat failed.' };
   }
 
-  return { ok: true, reply: payload.reply, edits: normaliseEdits(payload.edits) };
+  return { ok: true, reply: payload.reply, edits: normaliseEdits(payload.edits), title_variants: normaliseTitleVariants(payload.title_variants) };
+}
+
+function normaliseTitleVariants(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((value) => typeof value === 'string' && value.trim() !== '')
+    .map((value) => value.trim())
+    .slice(0, 5);
 }
 
 function normaliseEdits(raw) {
@@ -54,11 +62,13 @@ function normaliseEdits(raw) {
   for (const key of [
     'title',
     'content',
+    'selection',
     'excerpt',
     'seo_title',
     'seo_description',
     'og_title',
     'og_description',
+    'focus_keyphrase',
   ]) {
     if (typeof raw[key] === 'string' && raw[key].trim() !== '') {
       edits[key] = raw[key];

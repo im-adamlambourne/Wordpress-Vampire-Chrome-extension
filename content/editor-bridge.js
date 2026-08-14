@@ -7,6 +7,8 @@ const MAX_SEO_TITLE_CHARS = 200;
 const MAX_SEO_DESCRIPTION_CHARS = 500;
 const MAX_OG_TITLE_CHARS = 200;
 const MAX_OG_DESCRIPTION_CHARS = 500;
+const MAX_FOCUS_KEYPHRASE_CHARS = 200;
+const MAX_SELECTION_CHARS = 8000;
 
 const SEO_FIELDS = [
   {
@@ -106,6 +108,35 @@ const SEO_FIELDS = [
       }
       if (typeof dispatch.setFacebookDescription === 'function') {
         dispatch.setFacebookDescription(value);
+        return true;
+      }
+      return false;
+    },
+  },
+  {
+    key: 'focus_keyphrase',
+    max: MAX_FOCUS_KEYPHRASE_CHARS,
+    inputs: ['yoast_wpseo_focuskw', 'rank_math_focus_keyword'],
+    names: [
+      'yoast_wpseo_focuskw',
+      'rank_math_focus_keyword',
+      'aioseo[posts][keyphrases][focus][keyphrase]',
+    ],
+    meta: [
+      '_yoast_wpseo_focuskw',
+      'rank_math_focus_keyword',
+      '_aioseo_focus_keyphrase',
+    ],
+    yoastRead: ['getFocusKeyphrase', 'getKeyphrase', 'getFocusKeyword'],
+    rankRead: ['getFocusKeyword', 'getKeywords'],
+    rankWrite: ['updateKeyword', 'setFocusKeyword', 'setKeywords'],
+    yoastWrite(dispatch, value) {
+      if (typeof dispatch.setFocusKeyword === 'function') {
+        dispatch.setFocusKeyword(value);
+        return true;
+      }
+      if (typeof dispatch.updateData === 'function') {
+        dispatch.updateData({ keyword: value, focusKeyphrase: value });
         return true;
       }
       return false;
@@ -226,6 +257,7 @@ function takeSnapshot(editorType) {
   return truncateSnapshot({
     ...core,
     ...readSeoSnapshot(),
+    selection: takeSelection(editorType),
   });
 }
 
@@ -238,8 +270,92 @@ function truncateSnapshot(snapshot) {
     seo_description: String(snapshot.seo_description || '').slice(0, MAX_SEO_DESCRIPTION_CHARS),
     og_title: String(snapshot.og_title || '').slice(0, MAX_OG_TITLE_CHARS),
     og_description: String(snapshot.og_description || '').slice(0, MAX_OG_DESCRIPTION_CHARS),
+    focus_keyphrase: String(snapshot.focus_keyphrase || '').slice(0, MAX_FOCUS_KEYPHRASE_CHARS),
+    selection: truncateSelection(snapshot.selection),
     editor_type: snapshot.editor_type,
   };
+}
+
+function emptySelection() {
+  return { html: '', text: '', client_ids: [] };
+}
+
+function truncateSelection(raw) {
+  if (!raw || typeof raw !== 'object') return emptySelection();
+  const clientIds = Array.isArray(raw.client_ids)
+    ? raw.client_ids.filter((id) => typeof id === 'string' && id !== '').slice(0, 20)
+    : [];
+  return {
+    html: String(raw.html || '').slice(0, MAX_SELECTION_CHARS),
+    text: String(raw.text || '').slice(0, MAX_SELECTION_CHARS),
+    client_ids: clientIds,
+  };
+}
+
+function takeSelection(editorType) {
+  return editorType === 'gutenberg' ? gutenbergSelection() : classicSelection();
+}
+
+function gutenbergClientIds() {
+  try {
+    const select = window.wp.data.select('core/block-editor');
+    if (typeof select.getSelectedBlockClientIds === 'function') {
+      const ids = select.getSelectedBlockClientIds() || [];
+      if (ids.length) return ids.map(String);
+    }
+    if (typeof select.getMultiSelectedBlockClientIds === 'function') {
+      const ids = select.getMultiSelectedBlockClientIds() || [];
+      if (ids.length) return ids.map(String);
+    }
+    const selected = typeof select.getSelectedBlock === 'function'
+      ? select.getSelectedBlock()
+      : null;
+    return selected?.clientId ? [String(selected.clientId)] : [];
+  } catch {
+    return [];
+  }
+}
+
+function gutenbergSelection() {
+  try {
+    const ids = gutenbergClientIds();
+    if (!ids.length) return emptySelection();
+    const select = window.wp.data.select('core/block-editor');
+    const blocks = ids.map((id) => select.getBlock?.(id)).filter(Boolean);
+    if (!blocks.length) return emptySelection();
+    const html = typeof window.wp.blocks.serialize === 'function'
+      ? String(window.wp.blocks.serialize(blocks) || '')
+      : '';
+    return truncateSelection({
+      html,
+      text: plainTextFromHtml(html),
+      client_ids: ids,
+    });
+  } catch {
+    return emptySelection();
+  }
+}
+
+function classicSelection() {
+  try {
+    const editor = window.tinymce?.get?.('content');
+    if (editor && typeof editor.selection?.getContent === 'function'
+      && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
+      const html = String(editor.selection.getContent() || '');
+      const text = String(editor.selection.getContent({ format: 'text' }) || '');
+      return truncateSelection({ html, text, client_ids: [] });
+    }
+    const textarea = document.getElementById('content');
+    if (!textarea || typeof textarea.selectionStart !== 'number') return emptySelection();
+    const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+    return truncateSelection({ html: selected, text: selected, client_ids: [] });
+  } catch {
+    return emptySelection();
+  }
+}
+
+function plainTextFromHtml(html) {
+  return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function fieldValue(id) {
@@ -279,6 +395,17 @@ function normaliseEdits(raw) {
   if (typeof raw.excerpt === 'string' && raw.excerpt.trim() !== '') {
     edits.excerpt = raw.excerpt.trim().slice(0, MAX_EXCERPT_CHARS);
   }
+  if (typeof raw.selection === 'string' && raw.selection.trim() !== '') {
+    edits.selection = stripScripts(raw.selection).trim().slice(0, MAX_SELECTION_CHARS);
+  }
+  if (Array.isArray(raw.selection_client_ids)) {
+    edits.selection_client_ids = raw.selection_client_ids
+      .filter((id) => typeof id === 'string' && id !== '')
+      .slice(0, 20);
+  }
+  if (typeof raw.selection_original === 'string' && raw.selection_original.trim() !== '') {
+    edits.selection_original = raw.selection_original.trim().slice(0, MAX_SELECTION_CHARS);
+  }
   for (const field of SEO_FIELDS) {
     if (typeof raw[field.key] === 'string' && raw[field.key].trim() !== '') {
       edits[field.key] = raw[field.key].trim().slice(0, field.max);
@@ -299,7 +426,9 @@ function applyGutenberg(edits) {
   if (edits.title) meta.title = edits.title;
   if (edits.excerpt) meta.excerpt = edits.excerpt;
 
-  if (edits.content) {
+  if (edits.selection) {
+    applied.push(...applyGutenbergSelection(edits));
+  } else if (edits.content) {
     const blocks = htmlToBlocks(edits.content);
     if (!blocks.length) {
       throw new Error('Could not parse the updated body.');
@@ -354,6 +483,33 @@ function htmlToBlocks(html) {
   return window.wp.blocks.rawHandler({ HTML: html });
 }
 
+function applyGutenbergSelection(edits) {
+  const blocks = htmlToBlocks(edits.selection);
+  if (!blocks.length) {
+    throw new Error('Could not parse the selected copy.');
+  }
+  const ids = Array.isArray(edits.selection_client_ids) && edits.selection_client_ids.length
+    ? edits.selection_client_ids
+    : gutenbergClientIds();
+  if (!ids.length) {
+    throw new Error('No selected block to update.');
+  }
+  const blockEditor = window.wp.data.dispatch('core/block-editor');
+  const before = editedPostContent();
+  try {
+    if (typeof blockEditor.replaceBlocks === 'function') {
+      blockEditor.replaceBlocks(ids, blocks);
+    } else if (ids.length === 1 && typeof blockEditor.replaceBlock === 'function') {
+      blockEditor.replaceBlock(ids[0], blocks[0]);
+    } else {
+      throw new Error('Could not replace the selected block.');
+    }
+  } catch (err) {
+    if (editedPostContent() === before) throw err;
+  }
+  return ['selection'];
+}
+
 function applyClassic(edits) {
   const applied = [];
 
@@ -372,7 +528,9 @@ function applyClassic(edits) {
     }
   }
 
-  if (edits.content) {
+  if (edits.selection) {
+    applied.push(...applyClassicSelection(edits));
+  } else if (edits.content) {
     const editor = window.tinymce?.get?.('content');
     if (editor && typeof editor.setContent === 'function'
       && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
@@ -393,6 +551,52 @@ function applyClassic(edits) {
   }
 
   return applied;
+}
+
+function applyClassicSelection(edits) {
+  const html = edits.selection;
+  const editor = window.tinymce?.get?.('content');
+  if (editor && typeof editor.selection?.setContent === 'function'
+    && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
+    const selected = String(editor.selection.getContent() || '');
+    if (selected.trim() !== '') {
+      editor.selection.setContent(html);
+    } else if (!replaceClassicHtml(editor, edits.selection_original, html)) {
+      throw new Error('No selected text to update.');
+    }
+    markTinyMceDirty(editor);
+    return ['selection'];
+  }
+
+  const textarea = document.getElementById('content');
+  if (!textarea) throw new Error('Could not find the body field.');
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+    setFieldValue(textarea, textarea.value.slice(0, start) + html + textarea.value.slice(end));
+    return ['selection'];
+  }
+  const original = typeof edits.selection_original === 'string' ? edits.selection_original : '';
+  if (original) {
+    const idx = textarea.value.indexOf(original);
+    if (idx !== -1) {
+      setFieldValue(
+        textarea,
+        textarea.value.slice(0, idx) + html + textarea.value.slice(idx + original.length),
+      );
+      return ['selection'];
+    }
+  }
+  throw new Error('No selected text to update.');
+}
+
+function replaceClassicHtml(editor, original, html) {
+  if (typeof original !== 'string' || original.trim() === '') return false;
+  const content = String(editor.getContent() || '');
+  const idx = content.indexOf(original);
+  if (idx === -1) return false;
+  editor.setContent(content.slice(0, idx) + html + content.slice(idx + original.length));
+  return true;
 }
 
 function markTinyMceDirty(editor) {
@@ -520,7 +724,11 @@ function storeDispatch(name) {
 function callStoreReader(store, method) {
   if (typeof store[method] !== 'function') return '';
   try {
-    return String(store[method]() || '').trim();
+    const value = store[method]();
+    if (Array.isArray(value)) {
+      return String(value.find((item) => typeof item === 'string' && item.trim() !== '') || '').trim();
+    }
+    return String(value || '').trim();
   } catch {
     return '';
   }

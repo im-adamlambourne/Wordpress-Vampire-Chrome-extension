@@ -1,8 +1,7 @@
 const HOST_ID = 'wp-vampire-chat';
 const PANEL_ID = 'wpv-chat-panel';
 const INPUT_ID = 'wpv-chat-input';
-const FIELD_ERROR_ID = 'wpv-chat-input-error';
-const GREETING = 'I can help with this article. Ask me to review or rewrite the draft, excerpt, SEO, or Open Graph fields.';
+const GREETING = 'I can help with this article. Ask me to review or rewrite the draft, excerpt, SEO, or Open Graph fields — or use SEO pack and Headline ideas below.';
 const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
 const SIGNED_IN_PLACEHOLDER = 'Type your message...';
 const DEFAULT_USER_NAME = 'User';
@@ -15,12 +14,28 @@ const AUTH_KEYS = ['apiToken', 'apiUserName'];
 const EDIT_KEYS = [
   'title',
   'content',
+  'selection',
   'excerpt',
   'seo_title',
   'seo_description',
   'og_title',
   'og_description',
+  'focus_keyphrase',
 ];
+const SEO_PACK_PROMPT = 'Write the excerpt, SEO title, SEO description, Open Graph title, Open Graph description, and focus keyphrase from this draft. Do not change the post title or body.';
+const HEADLINES_PROMPT = 'Suggest 5 alternative headlines for this draft. Do not change the draft yet.';
+const FIELD_LABELS = {
+  title: 'Title',
+  body: 'Body',
+  content: 'Body',
+  selection: 'Selected copy',
+  excerpt: 'Excerpt',
+  seo_title: 'SEO title',
+  seo_description: 'SEO description',
+  og_title: 'Open Graph title',
+  og_description: 'Open Graph description',
+  focus_keyphrase: 'Focus keyphrase',
+};
 
 // Inlined from chat-modal.css. Content-script fetch() of chrome-extension://
 // URLs uses the page origin and is blocked (page CSP / no WAR), so the
@@ -206,6 +221,12 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   background: var(--ws-panel);
 }
 
+.wpv-chat__avatar--robot {
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
 .wpv-chat__bubble {
   display: flex;
   flex-direction: column;
@@ -361,18 +382,6 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   border-color: #f87171;
 }
 
-.wpv-chat__field-error {
-  display: none;
-  color: #fca5a5;
-  font-size: 0.75rem;
-}
-
-.wpv-chat__input:user-invalid + .wpv-chat__field-error {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
 .wpv-chat__input:disabled,
 .wpv-chat__send:disabled {
   opacity: 0.5;
@@ -435,6 +444,235 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 
 .wpv-chat__fab:hover:not(:disabled) {
   background: var(--brand-700);
+}
+
+.wpv-chat__checklist {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ws-hairline);
+  background: var(--ws-well-4);
+}
+
+.wpv-chat__checklist > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.wpv-chat__checklist > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wpv-chat__checklist-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.wpv-chat__checklist-items {
+  margin: 0;
+  padding: 0 0.75rem 0.5rem;
+  list-style: none;
+}
+
+.wpv-chat__check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.2rem 0.25rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpv-chat__check:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.wpv-chat__check:disabled {
+  cursor: default;
+}
+
+.wpv-chat__check:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.wpv-chat__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #4ade80;
+}
+
+.wpv-chat__dot--warn {
+  background: #fbbf24;
+}
+
+.wpv-chat__dot--gap {
+  background: #f87171;
+}
+
+.wpv-chat__composer-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.wpv-chat__hint {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.wpv-chat__actions {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.wpv-chat__chip {
+  flex-shrink: 0;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--ws-hairline);
+  border-radius: 999px;
+  background: var(--ws-well-4);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.wpv-chat__chip:hover:not(:disabled) {
+  background: var(--ws-well-5);
+}
+
+.wpv-chat__chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wpv-chat__chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.wpv-chat__variants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.wpv-chat__variant {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--ws-hairline);
+  border-radius: 0.5rem;
+  background: var(--ws-well-4);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpv-chat__variant:hover:not(:disabled) {
+  background: var(--ws-well-5);
+}
+
+.wpv-chat__diff {
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: min(28rem, 80vh);
+  padding: 0;
+  border: 1px solid var(--window-border);
+  border-radius: 0.75rem;
+  background: #0b1220;
+  color: var(--text);
+}
+
+.wpv-chat__diff::backdrop {
+  background: rgb(2 12 27 / 0.55);
+}
+
+.wpv-chat__diff-form {
+  display: flex;
+  flex-direction: column;
+  max-height: min(28rem, 80vh);
+}
+
+.wpv-chat__diff-form h3 {
+  margin: 0;
+  padding: 0.85rem 1rem 0.4rem;
+  font-size: 0.95rem;
+}
+
+.wpv-chat__diff-body {
+  overflow-y: auto;
+  padding: 0 1rem 0.75rem;
+}
+
+.wpv-chat__diff-row + .wpv-chat__diff-row {
+  margin-top: 0.65rem;
+}
+
+.wpv-chat__diff-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wpv-chat__diff-old,
+.wpv-chat__diff-new {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.wpv-chat__diff-old {
+  color: #fca5a5;
+  text-decoration: line-through;
+}
+
+.wpv-chat__diff-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--ws-hairline);
+}
+
+.wpv-chat__diff-cancel,
+.wpv-chat__diff-apply {
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpv-chat__diff-cancel {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.wpv-chat__diff-apply {
+  background: var(--brand-600);
+  color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -537,7 +775,7 @@ function sendSpinner() {
 
 function robotAvatar() {
   const img = document.createElement('img');
-  img.className = 'wpv-chat__avatar';
+  img.className = 'wpv-chat__avatar wpv-chat__avatar--robot';
   img.src = chrome.runtime.getURL('assets/robot.png');
   img.alt = 'Agent';
   img.width = 28;
@@ -664,6 +902,8 @@ function fallbackArticleSnapshot() {
     seo_description: '',
     og_title: '',
     og_description: '',
+    focus_keyphrase: '',
+    selection: { html: '', text: '', client_ids: [] },
     editor_type: '',
     post_id: '',
     post_type: '',
@@ -709,6 +949,8 @@ async function articleSnapshot() {
       seo_description: result.snapshot.seo_description || fallback.seo_description,
       og_title: result.snapshot.og_title || fallback.og_title,
       og_description: result.snapshot.og_description || fallback.og_description,
+      focus_keyphrase: result.snapshot.focus_keyphrase || fallback.focus_keyphrase,
+      selection: result.snapshot.selection || fallback.selection,
       editor_type: result.snapshot.editor_type || fallback.editor_type,
     };
   } catch {
@@ -719,7 +961,92 @@ async function articleSnapshot() {
 function compactArticle(article) {
   const next = { ...article };
   if (!next.editor_type) delete next.editor_type;
+  if (!next.focus_keyphrase) delete next.focus_keyphrase;
+  if (next.selection) {
+    const html = String(next.selection.html || '').trim();
+    const text = String(next.selection.text || '').trim();
+    if (!html && !text) delete next.selection;
+    else next.selection = { html, text };
+  }
   return next;
+}
+
+function hasSelection(article) {
+  const selection = article?.selection;
+  if (!selection || typeof selection !== 'object') return false;
+  return String(selection.html || '').trim() !== '' || String(selection.text || '').trim() !== '';
+}
+
+function previewText(value, max = 140) {
+  const text = plainText(value);
+  if (text.length <= max) return text || '(empty)';
+  return `${text.slice(0, max)}…`;
+}
+
+function checklistItems(article) {
+  const title = String(article.title || '').trim();
+  const excerpt = String(article.excerpt || '').trim();
+  const seoTitle = String(article.seo_title || '').trim();
+  const seoDescription = String(article.seo_description || '').trim();
+  const ogTitle = String(article.og_title || '').trim();
+  const ogDescription = String(article.og_description || '').trim();
+  const keyphrase = String(article.focus_keyphrase || '').trim();
+  const body = plainText(article.content);
+  return [
+    {
+      id: 'title',
+      label: 'Title',
+      ok: title.length > 0,
+      warn: title.length > 70,
+      prompt: 'Write a stronger post title. Do not change the body.',
+    },
+    {
+      id: 'excerpt',
+      label: 'Excerpt',
+      ok: excerpt.length > 0,
+      prompt: 'Write a standfirst / excerpt from this draft. Do not change the title or body.',
+    },
+    {
+      id: 'seo_title',
+      label: 'SEO title',
+      ok: seoTitle.length > 0,
+      warn: seoTitle.length > 60,
+      prompt: 'Write an SEO title of 60 characters or fewer. Do not change the post title or body.',
+    },
+    {
+      id: 'seo_description',
+      label: 'SEO description',
+      ok: seoDescription.length > 0,
+      warn: seoDescription.length > 155,
+      prompt: 'Write an SEO meta description of 155 characters or fewer. Do not change the title or body.',
+    },
+    {
+      id: 'og_title',
+      label: 'OG title',
+      ok: ogTitle.length > 0,
+      warn: ogTitle.length > 70,
+      prompt: 'Write an Open Graph title of 70 characters or fewer. Do not change the post title or body.',
+    },
+    {
+      id: 'og_description',
+      label: 'OG description',
+      ok: ogDescription.length > 0,
+      warn: ogDescription.length > 200,
+      prompt: 'Write an Open Graph description of 200 characters or fewer. Do not change the title or body.',
+    },
+    {
+      id: 'focus_keyphrase',
+      label: 'Keyphrase',
+      ok: keyphrase.length > 0,
+      prompt: 'Set a focus keyphrase from this draft. Do not change the title or body.',
+    },
+    {
+      id: 'body',
+      label: 'Body',
+      ok: body.length >= 200,
+      prompt: 'Expand the draft with a stronger intro and more detail. Keep existing facts.',
+    },
+  ];
 }
 
 function hasEdits(edits) {
@@ -733,11 +1060,13 @@ function describeApplied(applied) {
   const labels = {
     title: 'title',
     body: 'body',
+    selection: 'selected copy',
     excerpt: 'excerpt',
     seo_title: 'SEO title',
     seo_description: 'SEO description',
     og_title: 'Open Graph title',
     og_description: 'Open Graph description',
+    focus_keyphrase: 'focus keyphrase',
   };
   const parts = (Array.isArray(applied) ? applied : [])
     .map((key) => labels[key])
@@ -748,9 +1077,14 @@ function describeApplied(applied) {
   return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
 }
 
-async function applyEditorEdits(edits) {
+async function applyEditorEdits(edits, context = {}) {
+  const payload = { ...edits };
+  if (payload.selection && context.selection) {
+    payload.selection_client_ids = context.selection.client_ids || [];
+    payload.selection_original = context.selection.html || context.selection.text || '';
+  }
   try {
-    const result = await callEditorBridge('apply', { edits }, APPLY_TIMEOUT_MS);
+    const result = await callEditorBridge('apply', { edits: payload }, APPLY_TIMEOUT_MS);
     const what = describeApplied(result?.applied);
     if (what) return applySuccessStatus(what);
     if (result?.ok) {
@@ -790,6 +1124,12 @@ async function inferAppliedFields(edits) {
   if (edits.og_title && sameText(article.og_title, edits.og_title)) applied.push('og_title');
   if (edits.og_description && sameText(article.og_description, edits.og_description)) {
     applied.push('og_description');
+  }
+  if (edits.focus_keyphrase && sameText(article.focus_keyphrase, edits.focus_keyphrase)) {
+    applied.push('focus_keyphrase');
+  }
+  if (edits.selection && contentLooksApplied(article.content, edits.selection)) {
+    applied.push('selection');
   }
   if (edits.content && contentLooksApplied(article.content, edits.content)) {
     applied.push('body');
@@ -848,6 +1188,8 @@ function appendMessage(messages, scroller, {
   error = false,
   status = '',
   statusError = false,
+  variants = [],
+  onPickVariant = null,
 }) {
   const isUser = role === 'user';
   const className = error
@@ -862,6 +1204,23 @@ function appendMessage(messages, scroller, {
       className: statusError ? 'wpv-chat__status wpv-chat__status--error' : 'wpv-chat__status',
       text: status,
     }));
+  }
+  if (Array.isArray(variants) && variants.length > 0) {
+    const list = el('div', {
+      className: 'wpv-chat__variants',
+      role: 'group',
+      'aria-label': 'Headline ideas',
+    });
+    for (const title of variants) {
+      const button = el('button', {
+        type: 'button',
+        className: 'wpv-chat__variant',
+        text: title,
+      });
+      button.addEventListener('click', () => onPickVariant?.(title));
+      list.appendChild(button);
+    }
+    bubbleChildren.push(list);
   }
   children.push(el('div', { className: 'wpv-chat__bubble' }, bubbleChildren));
   messages.appendChild(el('li', { className }, children));
@@ -883,10 +1242,81 @@ function setComposerEnabled(root, { signedIn, busy }) {
   form.setAttribute('aria-busy', busy ? 'true' : 'false');
   label.hidden = busy;
   spinner.hidden = !busy;
+  for (const control of root.querySelectorAll('.wpv-chat__chip, .wpv-chat__variant')) {
+    control.disabled = disabled;
+  }
 
   if (disabled) {
     input.removeAttribute('aria-invalid');
   }
+}
+
+function currentValueForDiff(article, key) {
+  if (key === 'selection') {
+    return article?.selection?.html || article?.selection?.text || '';
+  }
+  if (key === 'content') return article?.content || '';
+  return article?.[key] || '';
+}
+
+function diffRows(article, edits) {
+  const rows = [];
+  for (const key of EDIT_KEYS) {
+    if (typeof edits[key] !== 'string' || edits[key].trim() === '') continue;
+    rows.push(el('div', { className: 'wpv-chat__diff-row' }, [
+      el('div', { className: 'wpv-chat__diff-label', text: FIELD_LABELS[key] || key }),
+      el('p', { className: 'wpv-chat__diff-old', text: previewText(currentValueForDiff(article, key)) }),
+      el('p', { className: 'wpv-chat__diff-new', text: previewText(edits[key]) }),
+    ]));
+  }
+  return rows;
+}
+
+function confirmEdits(root, article, edits) {
+  const dialog = root.querySelector('.wpv-chat__diff');
+  const body = dialog.querySelector('.wpv-chat__diff-body');
+  body.replaceChildren(...diffRows(article, edits));
+  return new Promise((resolve) => {
+    const onClose = () => {
+      dialog.removeEventListener('close', onClose);
+      resolve(dialog.returnValue === 'apply');
+    };
+    dialog.addEventListener('close', onClose);
+    dialog.showModal();
+  });
+}
+
+function renderChecklist(root, article, { signedIn, busy, onFix }) {
+  const items = checklistItems(article);
+  const gaps = items.filter((item) => !item.ok || item.warn).length;
+  const count = root.querySelector('.wpv-chat__checklist-count');
+  const list = root.querySelector('.wpv-chat__checklist-items');
+  count.textContent = gaps === 0 ? 'Ready' : `${gaps} to fix`;
+  list.replaceChildren(...items.map((item) => {
+    const tone = !item.ok ? 'gap' : item.warn ? 'warn' : 'ok';
+    const needsFix = !item.ok || item.warn;
+    const button = el('button', {
+      type: 'button',
+      className: 'wpv-chat__check',
+      disabled: !signedIn || busy || !needsFix,
+    }, [
+      el('span', {
+        className: tone === 'ok' ? 'wpv-chat__dot' : `wpv-chat__dot wpv-chat__dot--${tone}`,
+        'aria-hidden': 'true',
+      }),
+      el('span', { text: item.label }),
+    ]);
+    if (needsFix) {
+      button.addEventListener('click', () => onFix(item.prompt));
+    }
+    return el('li', {}, [button]);
+  }));
+}
+
+function updateSelectionHint(root, article) {
+  const hint = root.querySelector('.wpv-chat__hint');
+  if (!hint) return;
+  hint.hidden = !hasSelection(article);
 }
 
 function displayName(value) {
@@ -910,37 +1340,47 @@ function bindComposer(root) {
   const scroller = installAutoScroll(messages);
   const replySound = createReplySound();
   const transcript = [];
-  const state = { signedIn: false, busy: false, userName: DEFAULT_USER_NAME };
+  const state = {
+    signedIn: false,
+    busy: false,
+    userName: DEFAULT_USER_NAME,
+    lastArticle: null,
+  };
 
   const refreshComposer = () => setComposerEnabled(root, state);
 
-  input.addEventListener('blur', () => {
-    if (!input.disabled) syncAriaInvalid(input);
-  });
-  input.addEventListener('input', () => {
-    if (input.getAttribute('aria-invalid') === 'true') syncAriaInvalid(input);
-  });
+  async function refreshEditorChrome() {
+    const article = await articleSnapshot();
+    state.lastArticle = article;
+    renderChecklist(root, article, {
+      signedIn: state.signedIn,
+      busy: state.busy,
+      onFix: (prompt) => sendUserMessage(prompt),
+    });
+    updateSelectionHint(root, article);
+  }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function applyConfirmedEdits(edits, article) {
+    const accepted = await confirmEdits(root, article, edits);
+    if (!accepted) {
+      return { status: 'Edits not applied.', statusError: false };
+    }
+    const applied = await applyEditorEdits(edits, { selection: article?.selection });
+    await refreshEditorChrome();
+    return applied;
+  }
+
+  async function sendUserMessage(text) {
     if (state.busy || !state.signedIn) return;
-    if (!form.reportValidity()) {
-      syncAriaInvalid(input);
-      return;
-    }
-
-    const text = input.value.trim();
-    if (!text) {
-      syncAriaInvalid(input);
-      return;
-    }
+    const message = String(text || '').trim();
+    if (!message) return;
 
     input.value = '';
     input.removeAttribute('aria-invalid');
-    transcript.push({ role: 'user', content: text });
+    transcript.push({ role: 'user', content: message });
     appendMessage(messages, scroller, {
       role: 'user',
-      text,
+      text: message,
       userName: state.userName,
     });
 
@@ -948,13 +1388,16 @@ function bindComposer(root) {
     refreshComposer();
     setThinking(messages, scroller, true);
 
+    const article = await articleSnapshot();
+    state.lastArticle = article;
+
     let result;
     try {
       result = await chrome.runtime.sendMessage({
         type: 'PLUGIN_CHAT',
-        message: text,
+        message,
         history: transcript.slice(-MAX_HISTORY),
-        article: compactArticle(await articleSnapshot()),
+        article: compactArticle(article),
       });
     } catch (err) {
       result = { ok: false, error: err.message || 'Chat failed.' };
@@ -967,7 +1410,7 @@ function bindComposer(root) {
       let status = '';
       let statusError = false;
       if (hasEdits(result.edits)) {
-        const applied = await applyEditorEdits(result.edits);
+        const applied = await applyConfirmedEdits(result.edits, article);
         status = applied.status;
         statusError = applied.statusError;
       }
@@ -976,6 +1419,8 @@ function bindComposer(root) {
         text: result.reply,
         status,
         statusError,
+        variants: result.title_variants || [],
+        onPickVariant: (title) => applyConfirmedEdits({ title }, state.lastArticle || article),
       });
       playReplySound(replySound);
     } else {
@@ -990,8 +1435,32 @@ function bindComposer(root) {
     state.busy = false;
     Object.assign(state, await readAuthState());
     refreshComposer();
+    await refreshEditorChrome();
     if (state.signedIn) input.focus();
+  }
+
+  input.addEventListener('blur', () => {
+    if (!input.disabled) syncAriaInvalid(input);
   });
+  input.addEventListener('input', () => {
+    if (input.getAttribute('aria-invalid') === 'true') syncAriaInvalid(input);
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (state.busy || !state.signedIn) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    await sendUserMessage(text);
+  });
+
+  for (const chip of root.querySelectorAll('[data-quick-prompt]')) {
+    chip.addEventListener('click', () => {
+      sendUserMessage(chip.getAttribute('data-quick-prompt'));
+    });
+  }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
@@ -1005,9 +1474,14 @@ function bindComposer(root) {
     if (changes.apiToken || changes.apiUserName) refreshComposer();
   });
 
+  root.querySelector('[data-action="expand"]')?.addEventListener('click', () => {
+    refreshEditorChrome();
+  });
+
   (async () => {
     Object.assign(state, await readAuthState());
     refreshComposer();
+    await refreshEditorChrome();
   })();
 }
 
@@ -1049,17 +1523,9 @@ function buildShell() {
     placeholder: SIGNED_OUT_PLACEHOLDER,
     autocomplete: 'off',
     maxlength: '8000',
-    'aria-errormessage': FIELD_ERROR_ID,
     disabled: true,
   });
-  const fieldError = el('div', {
-    id: FIELD_ERROR_ID,
-    className: 'wpv-chat__field-error',
-  }, [
-    el('span', { 'aria-hidden': 'true', text: '!' }),
-    el('span', { text: 'Enter a message to send.' }),
-  ]);
-  const field = el('div', { className: 'wpv-chat__field' }, [input, fieldError]);
+  const field = el('div', { className: 'wpv-chat__field' }, [input]);
   const sendLabel = el('span', { className: 'wpv-chat__send-label', text: 'Send' });
   const spinnerWrap = el('span', {
     className: 'wpv-chat__send-spinner',
@@ -1074,6 +1540,65 @@ function buildShell() {
     className: 'wpv-chat__form',
     'aria-busy': 'false',
   }, [label, field, send]);
+  const hint = el('p', {
+    className: 'wpv-chat__hint',
+    hidden: true,
+    text: 'Rewriting the selected copy, not the whole article.',
+  });
+  const seoChip = el('button', {
+    type: 'button',
+    className: 'wpv-chat__chip',
+    'data-quick-prompt': SEO_PACK_PROMPT,
+    text: 'SEO pack',
+    disabled: true,
+  });
+  const headlinesChip = el('button', {
+    type: 'button',
+    className: 'wpv-chat__chip',
+    'data-quick-prompt': HEADLINES_PROMPT,
+    text: 'Headline ideas',
+    disabled: true,
+  });
+  const tools = el('div', { className: 'wpv-chat__composer-tools' }, [
+    hint,
+    el('div', {
+      className: 'wpv-chat__actions',
+      role: 'group',
+      'aria-label': 'Quick actions',
+    }, [seoChip, headlinesChip]),
+  ]);
+
+  const checklist = el('details', { className: 'wpv-chat__checklist' }, [
+    el('summary', {}, [
+      el('span', { text: 'Draft checklist' }),
+      el('span', { className: 'wpv-chat__checklist-count', text: 'Checking…' }),
+    ]),
+    el('ul', { className: 'wpv-chat__checklist-items' }),
+  ]);
+
+  const diff = el('dialog', {
+    className: 'wpv-chat__diff',
+    'aria-labelledby': 'wpv-chat-diff-title',
+  }, [
+    el('form', { method: 'dialog', className: 'wpv-chat__diff-form' }, [
+      el('h3', { id: 'wpv-chat-diff-title', text: 'Apply these edits?' }),
+      el('div', { className: 'wpv-chat__diff-body' }),
+      el('div', { className: 'wpv-chat__diff-actions' }, [
+        el('button', {
+          type: 'submit',
+          value: 'cancel',
+          className: 'wpv-chat__diff-cancel',
+          text: 'Don’t apply',
+        }),
+        el('button', {
+          type: 'submit',
+          value: 'apply',
+          className: 'wpv-chat__diff-apply',
+          text: 'Apply',
+        }),
+      ]),
+    ]),
+  ]);
 
   const windowEl = el('div', {
     id: PANEL_ID,
@@ -1083,8 +1608,9 @@ function buildShell() {
       el('h2', { className: 'wpv-chat__title', text: 'Chat with Agent' }),
       collapse,
     ]),
+    checklist,
     messages,
-    el('div', { className: 'wpv-chat__composer' }, [form]),
+    el('div', { className: 'wpv-chat__composer' }, [tools, form]),
   ]);
 
   const expand = el('button', {
@@ -1100,6 +1626,7 @@ function buildShell() {
   const root = el('aside', { className: 'wpv-chat', 'aria-label': 'Chat with Agent' }, [
     windowEl,
     fabWrap,
+    diff,
   ]);
 
   collapse.addEventListener('click', () => setOpen(root, false));

@@ -21,7 +21,7 @@ The popup (toolbar icon) is the sign-in screen. Open **Settings** (cog) to set t
 2. **Save host** and allow the origin when Chrome asks.
 3. Close Settings, then **Log in**. Chrome opens the sign-in window. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**.
 4. The popup closes during the bounce. A Chrome notification should confirm the login, and the plugin popup should reopen with **Successfully logged in as {name}**. Clicking the notification also opens the popup.
-5. If the WordPress editor is already open, the **Chat with Agent** composer enables as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with rolling-dot thinking loader, send spinner, and a short reply sound. Messages go to `POST /api/plugin/chat` (Gemini 3.5 Flash Lite). Replies show in the overlay. When the agent returns `edits`, the extension writes title, body, excerpt, SEO title/description, and Open Graph title/description into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present) and marks the draft unsaved so Save/Update and the leave-page warning work. It does not save or publish; use WordPress Undo to revert title/body.
+5. If the WordPress editor is already open, the **Chat with Agent** composer enables as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with rolling-dot thinking loader, send spinner, and a short reply sound. A draft checklist flags missing excerpt, SEO, Open Graph, keyphrase, or a thin body. **SEO pack** and **Headline ideas** chips sit above the composer. Messages go to `POST /api/plugin/chat` (Gemini 3.5 Flash Lite). Replies show in the overlay. When the agent returns `edits`, a dialog previews the change before the extension writes title, selected copy, body, excerpt, SEO title/description, Open Graph title/description, and focus keyphrase into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present) and marks the draft unsaved so Save/Update and the leave-page warning work. Headline ideas appear as buttons on the bubble. It does not save or publish; use WordPress Undo to revert title/body. If the WordPress host matches a Content Exchange site, house style is injected into the chat.
 
 The host is stored in `chrome.storage.local` so you can point at local, staging, or production without rebuilding. Changing host clears the stored token and display name.
 
@@ -49,8 +49,8 @@ Editor chat (signed in)
   → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
   → PLUGIN_CHAT
   → service worker POST {host}/api/plugin/chat
-  → thinking loader, then { reply, edits } in the overlay (reply sound)
-  → non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data or Classic/TinyMCE)
+  → thinking loader, then { reply, edits, title_variants } in the overlay (reply sound)
+  → confirm dialog, then non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data or Classic/TinyMCE)
 ```
 
 Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `popup/popup.html`, `content/chat-modal.js`, `content/editor-bridge.js`, `assets/robot.png`, `assets/chat-notification.mp3`.
@@ -67,4 +67,4 @@ Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-cha
 
 ## Out of scope until asked
 
-Save/publish, taxonomies, featured image, Open Graph image, focus keyphrase, custom meta (other than SEO/Open Graph text fields), WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
+Save/publish, taxonomies, featured image, Open Graph image, custom meta (other than SEO/Open Graph text fields and focus keyphrase), WordPress.com, Chrome Web Store listing (`CHROMEWEBSTORE.md`).
