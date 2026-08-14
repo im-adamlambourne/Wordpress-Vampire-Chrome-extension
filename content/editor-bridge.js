@@ -144,6 +144,125 @@ const SEO_FIELDS = [
   },
 ];
 
+const ACF_TEXT_TYPES = new Set(['text', 'textarea', 'wysiwyg', 'url', 'email', 'number']);
+const ACF_SEMANTIC_KEYS = [
+  'title',
+  'excerpt',
+  'seo_title',
+  'seo_description',
+  'og_title',
+  'og_description',
+  'focus_keyphrase',
+];
+const ACF_ALIASES = {
+  title: [
+    'short_headline',
+    'short_title',
+    'display_title',
+    'override_title',
+    'alternative_title',
+    'alt_title',
+    'seo_headline',
+  ],
+  excerpt: [
+    'excerpt',
+    'standfirst',
+    'stand_first',
+    'dek',
+    'deck',
+    'lede',
+    'lead',
+    'summary',
+    'short_description',
+    'intro',
+    'strapline',
+    'kicker',
+    'sell',
+    'sell_text',
+    'description',
+  ],
+  content: ['body', 'article_body', 'main_content', 'post_content', 'article_content'],
+  seo_title: ['seo_title', 'seotitle', 'meta_title', 'metatitle'],
+  seo_description: [
+    'seo_description',
+    'seodescription',
+    'meta_description',
+    'metadescription',
+    'metadesc',
+    'meta_desc',
+  ],
+  og_title: [
+    'og_title',
+    'ogtitle',
+    'open_graph_title',
+    'opengraph_title',
+    'facebook_title',
+    'social_title',
+  ],
+  og_description: [
+    'og_description',
+    'ogdescription',
+    'open_graph_description',
+    'opengraph_description',
+    'facebook_description',
+    'social_description',
+  ],
+  focus_keyphrase: [
+    'focus_keyphrase',
+    'focus_keyword',
+    'focuskw',
+    'keyphrase',
+    'keyword',
+  ],
+};
+const ACF_LABEL_ALIASES = {
+  title: ['short headline', 'short title', 'display title', 'override title'],
+  excerpt: [
+    'excerpt',
+    'standfirst',
+    'stand first',
+    'dek',
+    'deck',
+    'lede',
+    'strapline',
+    'kicker',
+    'sell',
+  ],
+  content: ['article body', 'main content', 'post content'],
+  seo_title: ['seo title', 'meta title'],
+  seo_description: ['seo description', 'meta description'],
+  og_title: ['og title', 'open graph title', 'facebook title', 'social title'],
+  og_description: [
+    'og description',
+    'open graph description',
+    'facebook description',
+    'social description',
+  ],
+  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase'],
+};
+const ACF_GENERIC_DATA_KEYS = new Set([
+  'description',
+  'title',
+  'text',
+  'content',
+  'body',
+  'html',
+  'copy',
+]);
+const ACF_BLOCK_TEXT_KEYS = new Set([
+  'text',
+  'content',
+  'body',
+  'copy',
+  'html',
+  'standfirst',
+  'excerpt',
+  'description',
+  'title',
+  'headline',
+  'intro',
+]);
+
 window.addEventListener(COMMAND_EVENT, (event) => {
   const detail = event.detail;
   if (!detail || typeof detail !== 'object') return;
@@ -172,7 +291,7 @@ window.addEventListener(COMMAND_EVENT, (event) => {
       dispatchResult({
         requestId,
         ok: true,
-        applied: applyEdits(editorType, detail.edits),
+        applied: await applyEdits(editorType, detail.edits),
       });
     } catch (err) {
       dispatchResult({
@@ -254,11 +373,11 @@ function takeSnapshot(editorType) {
       editor_type: 'classic',
     };
 
-  return truncateSnapshot({
+  return truncateSnapshot(fillEmptyFromAcf({
     ...core,
     ...readSeoSnapshot(),
     selection: takeSelection(editorType),
-  });
+  }));
 }
 
 function truncateSnapshot(snapshot) {
@@ -323,6 +442,16 @@ function gutenbergSelection() {
     const select = window.wp.data.select('core/block-editor');
     const blocks = ids.map((id) => select.getBlock?.(id)).filter(Boolean);
     if (!blocks.length) return emptySelection();
+    if (ids.length === 1) {
+      const acfText = acfBlockPlainText(blocks[0]);
+      if (acfText) {
+        return truncateSelection({
+          html: acfText,
+          text: plainTextFromHtml(acfText),
+          client_ids: ids,
+        });
+      }
+    }
     const html = typeof window.wp.blocks.serialize === 'function'
       ? String(window.wp.blocks.serialize(blocks) || '')
       : '';
@@ -371,15 +500,18 @@ function classicContent() {
   return fieldValue('content');
 }
 
-function applyEdits(editorType, rawEdits) {
+async function applyEdits(editorType, rawEdits) {
   const edits = normaliseEdits(rawEdits);
   if (Object.keys(edits).length === 0) return [];
+
+  await waitForAcfFields();
 
   const applied = editorType === 'gutenberg'
     ? applyGutenberg(edits)
     : applyClassic(edits);
   applied.push(...applySeoFields(edits));
-  return applied;
+  applied.push(...applyAcfFields(edits, applied));
+  return [...new Set(applied)];
 }
 
 function normaliseEdits(raw) {
@@ -484,13 +616,20 @@ function htmlToBlocks(html) {
 }
 
 function applyGutenbergSelection(edits) {
+  const ids = Array.isArray(edits.selection_client_ids) && edits.selection_client_ids.length
+    ? edits.selection_client_ids
+    : gutenbergClientIds();
+  if (ids.length === 1) {
+    const selected = storeSelect('core/block-editor')?.getBlock?.(ids[0]);
+    if (applyAcfBlockSelection(selected, edits.selection, edits.selection_original)) {
+      return ['selection'];
+    }
+  }
+
   const blocks = htmlToBlocks(edits.selection);
   if (!blocks.length) {
     throw new Error('Could not parse the selected copy.');
   }
-  const ids = Array.isArray(edits.selection_client_ids) && edits.selection_client_ids.length
-    ? edits.selection_client_ids
-    : gutenbergClientIds();
   if (!ids.length) {
     throw new Error('No selected block to update.');
   }
@@ -536,12 +675,14 @@ function applyClassic(edits) {
       && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
       editor.setContent(edits.content);
       markTinyMceDirty(editor);
+      applied.push('body');
     } else {
       const textarea = document.getElementById('content');
-      if (!textarea) throw new Error('Could not find the body field.');
-      setFieldValue(textarea, edits.content);
+      if (textarea) {
+        setFieldValue(textarea, edits.content);
+        applied.push('body');
+      }
     }
-    applied.push('body');
   }
 
   try {
@@ -777,6 +918,427 @@ function findSeoControl(field) {
 
 function cssEscapeAttr(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+async function waitForAcfFields(timeoutMs = 1200) {
+  if (!window.acf && !document.querySelector('.acf-field, #acf-form-data')) return;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (listAcfFields().length > 0) return;
+    await sleep(50);
+  }
+}
+
+function fillEmptyFromAcf(snapshot) {
+  const acf = readAcfSemanticSnapshot();
+  const next = { ...snapshot };
+  for (const key of ACF_SEMANTIC_KEYS) {
+    if (!String(next[key] || '').trim() && acf[key]) next[key] = acf[key];
+  }
+  return next;
+}
+
+function readAcfSemanticSnapshot() {
+  const snapshot = {};
+  for (const field of listAcfFields()) {
+    const semantic = semanticForAcfField(field);
+    if (!semantic || snapshot[semantic]) continue;
+    const value = readAcfField(field);
+    if (value) snapshot[semantic] = value;
+  }
+  Object.assign(snapshot, readAcfBlockSnapshot(snapshot));
+  return snapshot;
+}
+
+function applyAcfFields(edits, alreadyApplied) {
+  const applied = [];
+  const fields = listAcfFields();
+  for (const key of ACF_SEMANTIC_KEYS) {
+    if (!edits[key]) continue;
+    if (!writeAcfSemantic(fields, key, edits[key])) continue;
+    if (!alreadyApplied.includes(key) && !applied.includes(key)) applied.push(key);
+  }
+  if (edits.content && !alreadyApplied.includes('body')) {
+    if (writeAcfSemantic(fields, 'content', edits.content) && !applied.includes('body')) {
+      applied.push('body');
+    }
+  }
+  for (const key of applyAcfBlocks(edits)) {
+    if (!alreadyApplied.includes(key) && !applied.includes(key)) applied.push(key);
+  }
+  return applied;
+}
+
+function writeAcfSemantic(fields, semantic, value) {
+  let applied = false;
+  for (const field of fields) {
+    if (semanticForAcfField(field) !== semantic) continue;
+    if (writeAcfField(field, value)) applied = true;
+  }
+  return applied;
+}
+
+function listAcfFields() {
+  const fromApi = listAcfFieldsFromApi();
+  return fromApi.length ? fromApi : listAcfFieldsFromDom();
+}
+
+function listAcfFieldsFromApi() {
+  if (typeof window.acf?.getFields !== 'function') return [];
+  const seen = new Set();
+  const fields = [];
+  for (const type of ACF_TEXT_TYPES) {
+    let instances = [];
+    try {
+      instances = window.acf.getFields({ type }) || [];
+    } catch {
+      continue;
+    }
+    for (const instance of instances) {
+      const el = jqueryEl(instance?.$el);
+      if (el && isNestedAcfField(el)) continue;
+      const name = String(instance.get?.('name') || instance.data?.name || '');
+      const key = String(instance.get?.('key') || instance.data?.key || '');
+      const fieldType = String(instance.get?.('type') || instance.data?.type || type);
+      const id = key || name;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      fields.push({
+        instance,
+        el,
+        name,
+        key,
+        type: fieldType,
+        label: acfDomLabel(el) || name,
+      });
+    }
+  }
+  return fields;
+}
+
+function listAcfFieldsFromDom() {
+  const fields = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll('.acf-field[data-name], .acf-field[data-key]')) {
+    if (isNestedAcfField(el)) continue;
+    const type = String(el.getAttribute('data-type') || '');
+    if (type && !ACF_TEXT_TYPES.has(type)) continue;
+    const name = String(el.getAttribute('data-name') || '');
+    const key = String(el.getAttribute('data-key') || '');
+    const id = key || name;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    fields.push({
+      el,
+      name,
+      key,
+      type: type || 'text',
+      label: acfDomLabel(el) || name,
+    });
+  }
+  return fields;
+}
+
+function isNestedAcfField(el) {
+  return !!el.closest(
+    '.acf-clone, .acf-row, .layout, .acf-block-component, .acf-block-fields, .acf-block-preview, .block-editor-block-list__block',
+  );
+}
+
+function jqueryEl(value) {
+  if (!value) return null;
+  if (value instanceof Element) return value;
+  if (value[0] instanceof Element) return value[0];
+  return null;
+}
+
+function acfDomLabel(el) {
+  if (!(el instanceof Element)) return '';
+  const label = el.querySelector('.acf-label label, .acf-label');
+  return String(label?.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function normaliseAcfToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&amp;/g, 'and')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function semanticForAcfField(field) {
+  const name = normaliseAcfToken(field.name);
+  const label = String(field.label || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  for (const semantic of [...ACF_SEMANTIC_KEYS, 'content']) {
+    if ((ACF_ALIASES[semantic] || []).includes(name)) return semantic;
+    if ((ACF_LABEL_ALIASES[semantic] || []).some((alias) => label === alias || label.startsWith(`${alias} `))) {
+      return semantic;
+    }
+  }
+  return '';
+}
+
+function readAcfField(field) {
+  if (field.instance && typeof field.instance.val === 'function') {
+    try {
+      const value = field.instance.val();
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    } catch {
+      // Field type readers vary by ACF version.
+    }
+  }
+  const fromStore = readAcfDatastore(field);
+  if (fromStore) return fromStore;
+  const input = acfInputEl(field);
+  if (!input) return '';
+  if (field.type === 'wysiwyg' || input.classList.contains('wp-editor-area')) {
+    const editor = window.tinymce?.get?.(input.id);
+    if (editor && typeof editor.getContent === 'function'
+      && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
+      return String(editor.getContent() || '').trim();
+    }
+  }
+  return String(input.value || '').trim();
+}
+
+function writeAcfField(field, rawValue) {
+  const value = field.type === 'wysiwyg'
+    ? stripScripts(rawValue)
+    : plainTextFromHtml(rawValue);
+  let applied = writeAcfDatastore(field, value);
+
+  if (field.instance && typeof field.instance.val === 'function') {
+    try {
+      field.instance.val(value);
+      applied = true;
+    } catch {
+      // Some ACF field types reject programmatic val().
+    }
+  }
+
+  const input = acfInputEl(field);
+  if (input) {
+    if (field.type === 'wysiwyg' || input.classList.contains('wp-editor-area')) {
+      applied = writeAcfTinyMce(input, value) || applied;
+    }
+    setFieldValue(input, value);
+    applied = true;
+  }
+
+  if (field.name) writePostMeta([field.name], value);
+  if (field.key) writePostMeta([field.key], value);
+  try {
+    window.acf?.doAction?.('change', field.instance?.$el || window.jQuery?.(field.el));
+  } catch {
+    // ACF change actions are best-effort dirty marking.
+  }
+  return applied;
+}
+
+function acfInputEl(field) {
+  const root = field.el instanceof Element ? field.el : jqueryEl(field.instance?.$el);
+  if (!(root instanceof Element)) return null;
+  return root.querySelector(
+    'textarea.wp-editor-area, textarea[name^="acf["], input[name^="acf["], textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])',
+  );
+}
+
+function writeAcfTinyMce(textarea, value) {
+  const id = textarea?.id;
+  if (!id) return false;
+  try {
+    const editor = window.tinymce?.get?.(id);
+    if (!editor || typeof editor.setContent !== 'function') return false;
+    if (typeof editor.isHidden === 'function' && editor.isHidden()) return false;
+    editor.setContent(value);
+    try {
+      editor.undoManager?.add?.();
+      if (typeof editor.setDirty === 'function') editor.setDirty(true);
+      else editor.isNotDirty = false;
+      editor.fire?.('change');
+      editor.save?.();
+    } catch {
+      // TinyMCE dirty-marking must not fail a successful setContent.
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readAcfDatastore(field) {
+  const select = storeSelect('acf/fields');
+  if (!select) return '';
+  for (const id of [field.name, field.key]) {
+    if (!id) continue;
+    try {
+      if (typeof select.getFieldValue === 'function') {
+        const value = String(select.getFieldValue(id) || '').trim();
+        if (value) return value;
+      }
+    } catch {
+      // Datastore method names vary by ACF version.
+    }
+  }
+  return '';
+}
+
+function writeAcfDatastore(field, value) {
+  const dispatch = storeDispatch('acf/fields');
+  for (const id of [field.name, field.key]) {
+    if (!id || typeof dispatch?.setFieldValue !== 'function') continue;
+    try {
+      dispatch.setFieldValue(id, value);
+      return true;
+    } catch {
+      // Datastore writes vary by ACF version.
+    }
+  }
+  if (typeof window.acf?.store?.set === 'function') {
+    try {
+      window.acf.store.set(field.key || field.name, value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function gutenbergBlocks() {
+  try {
+    return storeSelect('core/block-editor')?.getBlocks?.() || [];
+  } catch {
+    return [];
+  }
+}
+
+function flattenBlocks(blocks) {
+  const out = [];
+  for (const block of blocks || []) {
+    out.push(block);
+    if (block.innerBlocks?.length) out.push(...flattenBlocks(block.innerBlocks));
+  }
+  return out;
+}
+
+function isAcfBlock(block) {
+  return !!block && String(block.name || '').startsWith('acf/');
+}
+
+function acfBlockSlug(block) {
+  return String(block?.name || '').replace(/^acf\//, '');
+}
+
+function acfBlockData(block) {
+  const data = block?.attributes?.data;
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+}
+
+function acfDataKeys(data) {
+  return Object.keys(data || {}).filter((key) => !key.startsWith('_') && typeof data[key] === 'string');
+}
+
+function pickAcfDataKey(data, semantic, { allowGeneric = false } = {}) {
+  const aliases = ACF_ALIASES[semantic] || [];
+  const keys = acfDataKeys(data);
+  const specific = keys.find((key) => {
+    const token = normaliseAcfToken(key);
+    return aliases.includes(token) && !ACF_GENERIC_DATA_KEYS.has(token);
+  });
+  if (specific) return specific;
+  if (!allowGeneric) return null;
+  const aliased = keys.find((key) => aliases.includes(normaliseAcfToken(key)));
+  if (aliased) return aliased;
+  return keys.find((key) => ACF_BLOCK_TEXT_KEYS.has(normaliseAcfToken(key))) || null;
+}
+
+function acfBlockPlainText(block) {
+  if (!isAcfBlock(block)) return '';
+  const data = acfBlockData(block);
+  if (!data) return '';
+  const keys = acfDataKeys(data).filter((key) => String(data[key] || '').trim());
+  if (!keys.length) return '';
+  const preferred = keys.find((key) => ACF_BLOCK_TEXT_KEYS.has(normaliseAcfToken(key)));
+  if (preferred) return String(data[preferred]).trim();
+  if (keys.length === 1) return String(data[keys[0]]).trim();
+  return '';
+}
+
+function applyAcfBlockSelection(block, html, original) {
+  if (!isAcfBlock(block)) return false;
+  const data = acfBlockData(block);
+  if (!data) return false;
+  const keys = acfDataKeys(data);
+  if (!keys.length) return false;
+
+  const originalText = String(original || '').trim();
+  let target = originalText
+    ? keys.find((key) => String(data[key] || '').trim() === originalText)
+    : null;
+  if (!target && keys.length === 1) target = keys[0];
+  if (!target) {
+    target = keys.find((key) => ACF_BLOCK_TEXT_KEYS.has(normaliseAcfToken(key)));
+  }
+  if (!target) return false;
+
+  const value = stripScripts(html);
+  storeDispatch('core/block-editor')?.updateBlockAttributes?.(block.clientId, {
+    data: { ...data, [target]: value },
+  });
+  return true;
+}
+
+function readAcfBlockSnapshot(existing) {
+  const snapshot = {};
+  for (const block of flattenBlocks(gutenbergBlocks())) {
+    if (!isAcfBlock(block)) continue;
+    const data = acfBlockData(block);
+    if (!data) continue;
+    const slug = normaliseAcfToken(acfBlockSlug(block));
+    for (const semantic of ACF_SEMANTIC_KEYS) {
+      if (existing[semantic] || snapshot[semantic]) continue;
+      if (!(ACF_ALIASES[semantic] || []).includes(slug)) continue;
+      const key = pickAcfDataKey(data, semantic, { allowGeneric: true });
+      const value = key ? String(data[key] || '').trim() : '';
+      if (value) snapshot[semantic] = value;
+    }
+  }
+  return snapshot;
+}
+
+function applyAcfBlocks(edits) {
+  const applied = [];
+  const dispatch = storeDispatch('core/block-editor');
+  if (typeof dispatch?.updateBlockAttributes !== 'function') return applied;
+
+  for (const block of flattenBlocks(gutenbergBlocks())) {
+    if (!isAcfBlock(block)) continue;
+    const data = acfBlockData(block);
+    if (!data) continue;
+    const slug = normaliseAcfToken(acfBlockSlug(block));
+    const next = { ...data };
+    let changed = false;
+
+    for (const semantic of ACF_SEMANTIC_KEYS) {
+      if (!edits[semantic]) continue;
+      const slugMatches = (ACF_ALIASES[semantic] || []).includes(slug);
+      const key = pickAcfDataKey(data, semantic, { allowGeneric: slugMatches });
+      if (!key) continue;
+      const value = semantic === 'excerpt' || semantic === 'title'
+        ? plainTextFromHtml(edits[semantic])
+        : edits[semantic];
+      if (next[key] === value) continue;
+      next[key] = value;
+      changed = true;
+      if (!applied.includes(semantic)) applied.push(semantic);
+    }
+
+    if (changed) {
+      dispatch.updateBlockAttributes(block.clientId, { data: next });
+    }
+  }
+  return applied;
 }
 
 function setFieldValue(el, value) {

@@ -71,7 +71,7 @@ function detectContent() {
 }
 
 function detectExcerpt() {
-  return valueOf('#excerpt');
+  return valueOf('#excerpt') || detectAcfSemanticValue('excerpt');
 }
 
 function detectNamedValue(ids) {
@@ -86,15 +86,137 @@ function detectNamedValue(ids) {
 
 function detectSeoSnapshot() {
   return {
-    seo_title: detectNamedValue(['yoast_wpseo_title', 'rank_math_title']),
-    seo_description: detectNamedValue(['yoast_wpseo_metadesc', 'rank_math_description']),
-    og_title: detectNamedValue(['yoast_wpseo_opengraph-title', 'rank_math_facebook_title']),
+    seo_title: detectNamedValue(['yoast_wpseo_title', 'rank_math_title'])
+      || detectAcfSemanticValue('seo_title'),
+    seo_description: detectNamedValue(['yoast_wpseo_metadesc', 'rank_math_description'])
+      || detectAcfSemanticValue('seo_description'),
+    og_title: detectNamedValue(['yoast_wpseo_opengraph-title', 'rank_math_facebook_title'])
+      || detectAcfSemanticValue('og_title'),
     og_description: detectNamedValue([
       'yoast_wpseo_opengraph-description',
       'rank_math_facebook_description',
-    ]),
-    focus_keyphrase: detectNamedValue(['yoast_wpseo_focuskw', 'rank_math_focus_keyword']),
+    ]) || detectAcfSemanticValue('og_description'),
+    focus_keyphrase: detectNamedValue(['yoast_wpseo_focuskw', 'rank_math_focus_keyword'])
+      || detectAcfSemanticValue('focus_keyphrase'),
   };
+}
+
+const ACF_ALIASES = {
+  excerpt: [
+    'excerpt',
+    'standfirst',
+    'stand_first',
+    'dek',
+    'deck',
+    'lede',
+    'lead',
+    'summary',
+    'short_description',
+    'intro',
+    'strapline',
+    'kicker',
+    'sell',
+    'sell_text',
+    'description',
+  ],
+  seo_title: ['seo_title', 'seotitle', 'meta_title', 'metatitle'],
+  seo_description: [
+    'seo_description',
+    'seodescription',
+    'meta_description',
+    'metadescription',
+    'metadesc',
+    'meta_desc',
+  ],
+  og_title: [
+    'og_title',
+    'ogtitle',
+    'open_graph_title',
+    'opengraph_title',
+    'facebook_title',
+    'social_title',
+  ],
+  og_description: [
+    'og_description',
+    'ogdescription',
+    'open_graph_description',
+    'opengraph_description',
+    'facebook_description',
+    'social_description',
+  ],
+  focus_keyphrase: [
+    'focus_keyphrase',
+    'focus_keyword',
+    'focuskw',
+    'keyphrase',
+    'keyword',
+  ],
+};
+const ACF_LABEL_ALIASES = {
+  excerpt: [
+    'excerpt',
+    'standfirst',
+    'stand first',
+    'dek',
+    'deck',
+    'lede',
+    'strapline',
+    'kicker',
+    'sell',
+  ],
+  seo_title: ['seo title', 'meta title'],
+  seo_description: ['seo description', 'meta description'],
+  og_title: ['og title', 'open graph title', 'facebook title', 'social title'],
+  og_description: [
+    'og description',
+    'open graph description',
+    'facebook description',
+    'social description',
+  ],
+  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase'],
+};
+const ACF_TEXT_TYPES = new Set(['text', 'textarea', 'wysiwyg', 'url', 'email', 'number']);
+
+function normaliseAcfToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function detectAcfSemanticValue(semantic) {
+  for (const el of document.querySelectorAll('.acf-field[data-name], .acf-field[data-key]')) {
+    if (el.closest('.acf-clone, .acf-row, .layout, .acf-block-component, .acf-block-fields, .acf-block-preview, .block-editor-block-list__block')) continue;
+    const type = String(el.getAttribute('data-type') || '');
+    if (type && !ACF_TEXT_TYPES.has(type)) continue;
+    const name = normaliseAcfToken(el.getAttribute('data-name'));
+    const label = String(
+      el.querySelector('.acf-label label, .acf-label')?.textContent || '',
+    ).toLowerCase().replace(/\s+/g, ' ').trim();
+    const nameMatch = (ACF_ALIASES[semantic] || []).includes(name);
+    const labelMatch = (ACF_LABEL_ALIASES[semantic] || [])
+      .some((alias) => label === alias || label.startsWith(`${alias} `));
+    if (!nameMatch && !labelMatch) continue;
+    const value = acfDomValue(el, type);
+    if (value) return value;
+  }
+  return '';
+}
+
+function acfDomValue(el, type) {
+  if (type === 'wysiwyg') {
+    const iframe = el.querySelector('iframe');
+    try {
+      const text = iframe?.contentDocument?.body?.innerText?.trim();
+      if (text) return text;
+    } catch {
+      // Cross-origin TinyMCE iframe — fall through to the textarea.
+    }
+  }
+  const input = el.querySelector(
+    'textarea.wp-editor-area, textarea[name^="acf["], input[name^="acf["], textarea, input[type="text"], input[type="url"], input[type="email"], input[type="number"]',
+  );
+  return typeof input?.value === 'string' ? input.value.trim() : '';
 }
 
 function detectArticleSnapshot() {
