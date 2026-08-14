@@ -45,7 +45,7 @@
   flex-direction: column;
   overflow: hidden;
   width: 21rem;
-  height: 40rem;
+  height: auto;
   max-height: calc(100vh - 2rem);
   background: var(--window-fill);
   backdrop-filter: blur(4px);
@@ -59,6 +59,14 @@
     overlay 0.2s ease-in allow-discrete,
     opacity 0.2s ease-in,
     transform 0.2s ease-in;
+}
+
+.wpv-chat--signed-in .wpv-chat__window {
+  height: 40rem;
+}
+
+.wpv-chat--signed-in .wpv-chat__signin {
+  display: none;
 }
 
 .wpv-chat--open .wpv-chat__window {
@@ -149,7 +157,8 @@
 
 .wpv-chat__icon-button:focus-visible,
 .wpv-chat__fab:focus-visible,
-.wpv-chat__send:focus-visible {
+.wpv-chat__send:focus-visible,
+.wpv-chat__signin-link:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -376,6 +385,64 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.wpv-chat__form[hidden],
+.wpv-chat__composer-tools[hidden],
+.wpv-chat__signin[hidden],
+.wpv-chat__greeting-items[hidden],
+.wpv-chat__signin-status[hidden],
+.wpv-chat__messages[hidden],
+.wpv-chat__checklist[hidden] {
+  display: none;
+}
+
+.wpv-chat__signin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 3rem;
+}
+
+.wpv-chat__signin-copy {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.wpv-chat__signin-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7ee2fc;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.wpv-chat__signin-link:hover:not(:disabled) {
+  color: #fff;
+}
+
+.wpv-chat__signin-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wpv-chat__signin-status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.wpv-chat__signin-status--error {
+  color: #f87171;
 }
 
 .wpv-chat__field {

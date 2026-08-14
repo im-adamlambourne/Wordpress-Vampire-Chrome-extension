@@ -53,7 +53,7 @@ FEATURES
 • Draft checklist flags missing or over-long title, excerpt, SEO, Open Graph, keyphrase, and a thin body. Click a gap to send a targeted prompt.
 • Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
 • If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
-• Sign in through the toolbar popup. Set your Content Studio server in Settings. A notification confirms a successful login.
+• Sign in from the chat overlay or the toolbar popup. Set your Content Studio server in Settings. A notification confirms a successful login.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
 
 HOW TO USE
@@ -61,7 +61,7 @@ HOW TO USE
 2. Pin Content Studio Plugin and open the toolbar popup.
 3. Open Settings, enter your Content Studio server, save, and allow access when Chrome asks.
 4. Click Log in, sign in to Content Studio, and Connect.
-5. Open a post or page in WordPress admin. The Revision Assistant appears at the bottom right.
+5. Open a post or page in WordPress admin. The Revision Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay (after the server is saved) or Log in in the popup.
 6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
 
 PRIVACY
@@ -216,7 +216,7 @@ How to configure
 2. Server: [STAGING CONTENT STUDIO ORIGIN]
 3. Save host and allow the origin when Chrome prompts.
 4. Close Settings → Log in → sign in → Connect.
-5. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay composer enables on an editor tab.
+5. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
 
 WordPress
 Open [STAGING WP ADMIN] → Posts → Edit a draft (Gutenberg or Classic). The Revision Assistant should appear bottom-right.
@@ -230,7 +230,7 @@ Try
 • Send “Tighten the title”.
 • Confirm the editor title changes and Save/Update shows unsaved changes.
 • WordPress Undo should revert the title.
-• Log out from the popup; composer should disable.
+• Log out from the popup; overlay hides the chat and shows Sign in.
 
 If you have no WordPress or Content Studio access
 The popup still opens. Without a host, login explains that a server must be saved. Content scripts only match URLs whose path contains /wp-admin/.
@@ -240,7 +240,7 @@ The popup still opens. Without a host, login explains that a server must be save
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 0.5.0 | 2026-08-14 | First private Chrome Web Store submission. Revision Assistant overlay, Content Studio login, draft edits including ACF standfirst/SEO fields. | Draft |
+| 0.5.0 | 2026-08-14 | First private Chrome Web Store submission. Revision Assistant overlay, Content Studio login from the overlay or popup, draft edits including ACF standfirst/SEO fields. | Draft |
 
 ## Review Notes
 

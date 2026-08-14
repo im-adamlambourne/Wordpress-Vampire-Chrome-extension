@@ -139,6 +139,31 @@ async function storePluginUserName(host, token) {
   }
 }
 
+async function resolvePluginLogin(message) {
+  if (message?.host && message?.verifier && message?.challenge && message?.state) {
+    return startPluginLogin({
+      host: message.host,
+      verifier: message.verifier,
+      challenge: message.challenge,
+      state: message.state,
+    });
+  }
+
+  const { apiHost } = await chrome.storage.local.get('apiHost');
+  if (!apiHost) {
+    await openPluginPopup();
+    throw new Error('Save a server host in the toolbar popup, then sign in.');
+  }
+
+  const pkce = await generatePkce();
+  return startPluginLogin({
+    host: apiHost,
+    verifier: pkce.verifier,
+    challenge: pkce.challenge,
+    state: pkce.state,
+  });
+}
+
 async function startPluginLogin({ host, verifier, challenge, state }) {
   if (!host || !verifier || !challenge || !state) {
     throw new Error('Save a server host, then try logging in again.');
@@ -192,7 +217,7 @@ function handlePluginAuthMessage(message, sendResponse) {
   if (message?.type === 'PLUGIN_LOGIN') {
     (async () => {
       try {
-        sendResponse(await startPluginLogin(message));
+        sendResponse(await resolvePluginLogin(message));
       } catch (err) {
         sendResponse({ ok: false, error: err.message || 'Login failed.' });
       }

@@ -5,7 +5,6 @@ const CHAT_TITLE = 'Revision Assistant';
 const GREETING_HI = 'Hi! 👋';
 const GREETING_BODY = "I'm your revision assistant. Tell me what you'd like to change: reword a section, tighten the intro, or refresh the headline, and I'll update the article for you.";
 const GREETING_ITEMS_LABEL = 'I can also';
-const SIGNED_OUT_PLACEHOLDER = 'Sign in via the toolbar popup';
 const SIGNED_IN_PLACEHOLDER = 'What should change?';
 const DEFAULT_USER_NAME = 'User';
 const MAX_HISTORY = 20;
@@ -96,7 +95,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   flex-direction: column;
   overflow: hidden;
   width: 21rem;
-  height: 40rem;
+  height: auto;
   max-height: calc(100vh - 2rem);
   background: var(--window-fill);
   backdrop-filter: blur(4px);
@@ -110,6 +109,14 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
     overlay 0.2s ease-in allow-discrete,
     opacity 0.2s ease-in,
     transform 0.2s ease-in;
+}
+
+.wpv-chat--signed-in .wpv-chat__window {
+  height: 40rem;
+}
+
+.wpv-chat--signed-in .wpv-chat__signin {
+  display: none;
 }
 
 .wpv-chat--open .wpv-chat__window {
@@ -200,7 +207,8 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 
 .wpv-chat__icon-button:focus-visible,
 .wpv-chat__fab:focus-visible,
-.wpv-chat__send:focus-visible {
+.wpv-chat__send:focus-visible,
+.wpv-chat__signin-link:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -427,6 +435,64 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.wpv-chat__form[hidden],
+.wpv-chat__composer-tools[hidden],
+.wpv-chat__signin[hidden],
+.wpv-chat__greeting-items[hidden],
+.wpv-chat__signin-status[hidden],
+.wpv-chat__messages[hidden],
+.wpv-chat__checklist[hidden] {
+  display: none;
+}
+
+.wpv-chat__signin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 3rem;
+}
+
+.wpv-chat__signin-copy {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.wpv-chat__signin-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7ee2fc;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.wpv-chat__signin-link:hover:not(:disabled) {
+  color: #fff;
+}
+
+.wpv-chat__signin-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wpv-chat__signin-status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.wpv-chat__signin-status--error {
+  color: #f87171;
 }
 
 .wpv-chat__field {
@@ -840,7 +906,7 @@ function greetingItem(item) {
   ]);
 }
 
-function greetingRow(rawUserName) {
+function greetingRow(rawUserName, { signedIn = false } = {}) {
   return el('li', {
     className: 'wpv-chat__row',
     'data-greeting': '',
@@ -848,12 +914,44 @@ function greetingRow(rawUserName) {
     robotAvatar(),
     el('div', { className: 'wpv-chat__bubble wpv-chat__bubble--greeting' }, [
       el('p', { 'data-greeting-text': '', text: greetingText(rawUserName) }),
-      el('div', { className: 'wpv-chat__greeting-items' }, [
+      el('div', {
+        className: 'wpv-chat__greeting-items',
+        hidden: !signedIn,
+      }, [
         el('p', { className: 'wpv-chat__greeting-label', text: GREETING_ITEMS_LABEL }),
         el('ul', { className: 'wpv-chat__greeting-list' }, GREETING_ITEMS.map(greetingItem)),
       ]),
     ]),
   ]);
+}
+
+function signInGate({ hidden = false } = {}) {
+  const link = el('button', {
+    type: 'button',
+    className: 'wpv-chat__signin-link',
+    text: 'Sign in',
+  });
+  const copy = el('p', { className: 'wpv-chat__signin-copy' });
+  copy.append(link, ' to chat about this draft.');
+  const status = el('p', {
+    className: 'wpv-chat__signin-status',
+    role: 'status',
+    'aria-live': 'polite',
+    hidden: true,
+  });
+  return el('div', {
+    className: 'wpv-chat__signin',
+    hidden,
+  }, [copy, status]);
+}
+
+function setSignInStatus(root, message, { error = false } = {}) {
+  const status = root.querySelector('.wpv-chat__signin-status');
+  if (!status) return;
+  const text = String(message || '').trim();
+  status.hidden = !text;
+  status.textContent = text;
+  status.classList.toggle('wpv-chat__signin-status--error', Boolean(error && text));
 }
 
 function updateGreeting(root, rawUserName) {
@@ -1343,18 +1441,37 @@ function appendMessage(messages, scroller, {
   scroller.scrollToBottom();
 }
 
-function setComposerEnabled(root, { signedIn, busy }) {
+function setComposerEnabled(root, { signedIn, busy, signingIn = false }) {
   const input = root.querySelector(`#${INPUT_ID}`);
   const send = root.querySelector('.wpv-chat__send');
   const label = root.querySelector('.wpv-chat__send-label');
   const spinner = root.querySelector('.wpv-chat__send-spinner');
   const form = root.querySelector('.wpv-chat__form');
+  const tools = root.querySelector('.wpv-chat__composer-tools');
+  const signin = root.querySelector('.wpv-chat__signin');
+  const signInLink = root.querySelector('.wpv-chat__signin-link');
+  const greetingItems = root.querySelector('.wpv-chat__greeting-items');
+  const messages = root.querySelector('.wpv-chat__messages');
+  const checklist = root.querySelector('.wpv-chat__checklist');
   const disabled = !signedIn || busy;
+
+  root.classList.toggle('wpv-chat--signed-in', signedIn);
+  form.hidden = !signedIn;
+  tools.hidden = !signedIn;
+  if (messages) messages.hidden = !signedIn;
+  if (checklist) checklist.hidden = !signedIn;
+  if (signin) {
+    signin.hidden = signedIn;
+    signin.setAttribute('aria-busy', signingIn ? 'true' : 'false');
+  }
+  if (signInLink) signInLink.disabled = signingIn;
+  if (greetingItems) greetingItems.hidden = !signedIn;
+  if (signedIn) setSignInStatus(root, '');
 
   input.disabled = disabled;
   send.disabled = disabled;
   input.required = signedIn && !busy;
-  input.placeholder = signedIn ? SIGNED_IN_PLACEHOLDER : SIGNED_OUT_PLACEHOLDER;
+  input.placeholder = SIGNED_IN_PLACEHOLDER;
   form.setAttribute('aria-busy', busy ? 'true' : 'false');
   label.hidden = busy;
   spinner.hidden = !busy;
@@ -1429,6 +1546,7 @@ function bindComposer(root, initialAuth = {}) {
   const state = {
     signedIn: false,
     busy: false,
+    signingIn: false,
     userName: DEFAULT_USER_NAME,
     rawUserName: '',
     lastArticle: null,
@@ -1437,6 +1555,29 @@ function bindComposer(root, initialAuth = {}) {
 
   const refreshComposer = () => setComposerEnabled(root, state);
   refreshComposer();
+
+  async function startSignIn() {
+    if (state.signedIn || state.signingIn) return;
+
+    state.signingIn = true;
+    setSignInStatus(root, 'Opening the sign-in window…');
+    refreshComposer();
+
+    let result;
+    try {
+      result = await chrome.runtime.sendMessage({ type: 'PLUGIN_LOGIN' });
+    } catch (err) {
+      result = { ok: false, error: err.message || 'Login failed.' };
+    }
+
+    state.signingIn = false;
+    Object.assign(state, await readAuthState());
+    if (!result?.ok && !state.signedIn) {
+      setSignInStatus(root, result?.error || 'Login failed.', { error: true });
+    }
+    refreshComposer();
+    if (state.signedIn) input.focus();
+  }
 
   async function refreshEditorChrome() {
     const article = await articleSnapshot();
@@ -1547,8 +1688,13 @@ function bindComposer(root, initialAuth = {}) {
     });
   }
 
+  root.querySelector('.wpv-chat__signin-link')?.addEventListener('click', async () => {
+    await startSignIn();
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
+    const wasSignedIn = state.signedIn;
     if (changes.apiToken) {
       state.signedIn = typeof changes.apiToken.newValue === 'string'
         && changes.apiToken.newValue.length > 0;
@@ -1558,7 +1704,11 @@ function bindComposer(root, initialAuth = {}) {
       state.rawUserName = rawUserName(changes.apiUserName.newValue);
       updateGreeting(root, state.rawUserName);
     }
-    if (changes.apiToken || changes.apiUserName) refreshComposer();
+    if (changes.apiToken || changes.apiUserName) {
+      if (state.signedIn) state.signingIn = false;
+      refreshComposer();
+      if (!wasSignedIn && state.signedIn) input.focus();
+    }
   });
 
   root.querySelector('[data-action="expand"]')?.addEventListener('click', () => {
@@ -1574,6 +1724,7 @@ function bindComposer(root, initialAuth = {}) {
 }
 
 function buildShell(auth = {}) {
+  const signedIn = Boolean(auth.signedIn);
   const collapse = el('button', {
     type: 'button',
     className: 'wpv-chat__icon-button',
@@ -1590,8 +1741,9 @@ function buildShell(auth = {}) {
     'aria-live': 'polite',
     'aria-relevant': 'additions',
     role: 'list',
+    hidden: !signedIn,
   }, [
-    greetingRow(auth.rawUserName || ''),
+    greetingRow(auth.rawUserName || '', { signedIn }),
   ]);
 
   const label = el('label', {
@@ -1604,7 +1756,7 @@ function buildShell(auth = {}) {
     className: 'wpv-chat__input',
     type: 'text',
     name: 'message',
-    placeholder: SIGNED_OUT_PLACEHOLDER,
+    placeholder: SIGNED_IN_PLACEHOLDER,
     autocomplete: 'off',
     maxlength: '8000',
     disabled: true,
@@ -1623,13 +1775,17 @@ function buildShell(auth = {}) {
   const form = el('form', {
     className: 'wpv-chat__form',
     'aria-busy': 'false',
+    hidden: !signedIn,
   }, [label, field, send]);
   const hint = el('p', {
     className: 'wpv-chat__hint',
     hidden: true,
     text: 'Rewriting the selected copy, not the whole article.',
   });
-  const tools = el('div', { className: 'wpv-chat__composer-tools' }, [
+  const tools = el('div', {
+    className: 'wpv-chat__composer-tools',
+    hidden: !signedIn,
+  }, [
     hint,
     el('div', {
       className: 'wpv-chat__actions',
@@ -1638,7 +1794,10 @@ function buildShell(auth = {}) {
     }, QUICK_ACTIONS.map(quickAction)),
   ]);
 
-  const checklist = el('details', { className: 'wpv-chat__checklist' }, [
+  const checklist = el('details', {
+    className: 'wpv-chat__checklist',
+    hidden: !signedIn,
+  }, [
     el('summary', {}, [
       el('span', { text: 'Draft checklist' }),
       el('span', { className: 'wpv-chat__checklist-count', text: 'Checking…' }),
@@ -1659,7 +1818,11 @@ function buildShell(auth = {}) {
     ]),
     checklist,
     messages,
-    el('div', { className: 'wpv-chat__composer' }, [tools, form]),
+    el('div', { className: 'wpv-chat__composer' }, [
+      tools,
+      form,
+      signInGate({ hidden: signedIn }),
+    ]),
   ]);
 
   const expand = el('button', {
@@ -1672,7 +1835,10 @@ function buildShell(auth = {}) {
   }, [svgIcon(['M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'], { size: 24 })]);
 
   const fabWrap = el('div', { className: 'wpv-chat__fab-wrap' }, [expand]);
-  const root = el('aside', { className: 'wpv-chat', 'aria-label': CHAT_TITLE }, [
+  const root = el('aside', {
+    className: signedIn ? 'wpv-chat wpv-chat--signed-in' : 'wpv-chat',
+    'aria-label': CHAT_TITLE,
+  }, [
     windowEl,
     fabWrap,
   ]);
