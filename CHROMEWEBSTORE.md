@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Content Studio Plugin
 
-> Last Updated: 2026-08-14
+> Last Updated: 2026-08-19
 
 Private Immediate Media listing. Not searchable on the public Chrome Web Store.
 Copy the fields below into the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
@@ -16,7 +16,7 @@ Use **Private**, not Unlisted. Unlisted is installable by anyone who has the URL
 2. Pay the one-time developer registration fee if the dashboard asks for it.
 3. **Account** tab → **Trusted testers**: add staff Google accounts if you are not using domain publishing (each address must be a Google account).
 4. Host `docs/privacy-policy.html` at a **public URL with no login wall**. Reviewers open this link. Intranet or Content Studio-behind-auth will fail review. Paste the live URL into **Privacy Policy URL** below and in the dashboard.
-5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.5.0.zip` as a new item.
+5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.6.0.zip` as a new item.
 6. As soon as the item exists, copy the **Item ID**. That ID is the production extension ID. Register this redirect on Content Studio (Laravel) before staff try store-build login:
 
    `https://<ITEM_ID>.chromiumapp.org/`
@@ -54,6 +54,7 @@ FEATURES
 • Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
 • If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
 • Sign in from the chat overlay or the toolbar popup. Set your Content Studio server in Settings. A notification confirms a successful login.
+• Chat replies arrive in the overlay after you send a message; you do not wait on a frozen page while the assistant works.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
 
 HOW TO USE
@@ -65,22 +66,23 @@ HOW TO USE
 6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
 
 PRIVACY
-The extension stores your server address, sign-in token, and display name on this computer. Chat and draft snapshots are sent only to the Content Studio server you configure, and only when you send a message. There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
+The extension stores your server address, sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to the Content Studio server you configure, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
 
 PERMISSIONS
 • “Read your browsing history” (tabs) — detect whether the current tab is WordPress admin so the toolbar icon can show connected or disconnected. The extension does not record a history of sites you visit.
 • “Read and change your data on wordpress admin pages” — show the overlay and update the open draft.
 • “Identity” — open the Content Studio sign-in window.
-• “Storage” — remember server, token, and display name.
+• “Storage” — remember server, token, display name, user id, and realtime connection settings.
 • “Notifications” — confirm login after the sign-in window closes.
-• Optional access to the server you enter — requested when you save a host, not at install, so login and chat can reach that origin.
+• “Offscreen documents” — keep a quiet background page open so chat replies can arrive after you send a message.
+• Optional access to the server you enter — requested when you save a host, not at install, so login, chat, and the realtime connection can reach that origin and the matching realtime host (local port 8081, or `ws.` plus the hostname you saved).
 
 This extension is for Immediate Media staff. It is not affiliated with Automattic or WordPress.com.
 
 SUPPORT
 Use the contact email on this listing or the Immediate Media Content Studio team.
 
-Version 0.5.0 — first Chrome Web Store submission (private).
+Version 0.6.0 — chat replies arrive over a realtime connection so the overlay is not blocked on a long HTTP request.
 
 **Category** [REQUIRED]
 Productivity
@@ -121,11 +123,12 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 | Permission | Type | Justification |
 |------------|------|---------------|
 | `tabs` | permissions | Read the current tab URL to detect WordPress admin (`/wp-admin/`) so the toolbar icon can show a connected or disconnected status for that tab. The extension does not use the history API and does not keep a log of visited sites. |
-| `storage` | permissions | Store the Content Studio server address the user saves, the sign-in token, and the display name used for the chat avatar. Data stays in Chrome local storage on the device (not synced). |
+| `storage` | permissions | Store the Content Studio server address the user saves, the sign-in token, the display name used for the chat avatar, a numeric user id used to join that user’s private chat channel, and public realtime connection settings returned at login (host, port, app key — never the server secret). Data stays in Chrome local storage on the device (not synced). |
 | `identity` | permissions | Open the Content Studio sign-in window and return the authorization redirect to the extension so staff can connect their account. This is not Google account sign-in. |
 | `notifications` | permissions | Show a “Successfully logged in” notification after the sign-in window closes, because the toolbar popup is already gone. Clicking the notification reopens the popup. |
+| `offscreen` | permissions | Keep a background page open with a realtime connection to Content Studio so assistant replies can arrive after the toolbar service has gone idle. The page has no UI and does not read WordPress. |
 | `*://*/wp-admin/*` | host_permissions | Run on self-hosted WordPress admin so the overlay can read the open draft and apply the user’s requested edits. Hosts vary by brand site, so the match is any `/wp-admin/` path rather than a single domain. The extension does not save or publish. |
-| `http://*/*` and `https://*/*` | optional_host_permissions | Not granted at install. When the user clicks Save host, Chrome prompts for that one origin so login, profile, logout, and chat can reach their Content Studio server (local, staging, or production). The extension does not use this grant to read arbitrary websites. |
+| `http://*/*` and `https://*/*` | optional_host_permissions | Not granted at install. When the user clicks Save host, Chrome prompts for the Content Studio origin and a matching realtime origin guessed from that saved hostname (`http://localhost:8081/*` on loopback, otherwise `https://ws.{hostname}/*`). After login, Echo connects to the `broadcasting.host` returned by Content Studio (the same host Laravel derives from that API request). The grant is so login, profile, logout, chat kick-off, channel authorization, and replies can reach those hosts. The extension does not use this grant to read arbitrary websites. |
 
 ## Privacy & Data Use
 
@@ -139,7 +142,7 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 | Health info | No | No | — | — |
 | Financial info | No | No | — | — |
 | Authentication info | Yes | Yes — authorization code exchange and bearer token to the configured host; token stored locally | Sign in, stay signed in, sign out | No, other than the user’s Content Studio server |
-| Personal communications | Yes | Yes — chat message, recent overlay transcript, and assistant replies via the configured host | Generate revision suggestions | No, other than the user’s Content Studio server (which may call Immediate Media’s AI providers) |
+| Personal communications | Yes | Yes — chat message, recent overlay transcript, and assistant replies via the configured host (HTTP kick-off plus a realtime connection for the reply) | Generate revision suggestions | No, other than the user’s Content Studio server (which may call Immediate Media’s AI providers) |
 | Location | No | No | — | — |
 | Web history | No | No | Tab URL is read only to detect wp-admin for the toolbar light; not stored as history | — |
 | User activity | Yes | Yes — sending a chat turn | Operate the revision assistant | No, other than the user’s Content Studio server |
@@ -214,7 +217,7 @@ Load the uploaded package. Pin the toolbar icon.
 How to configure
 1. Open the popup → Settings (cog).
 2. Server: [STAGING CONTENT STUDIO ORIGIN]
-3. Save host and allow the origin when Chrome prompts.
+3. Save host and allow the origin (and a second realtime origin if Chrome asks: local port 8081, or `ws.` plus the hostname you entered) when Chrome prompts.
 4. Close Settings → Log in → sign in → Connect.
 5. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
 
@@ -240,6 +243,7 @@ The popup still opens. Without a host, login explains that a server must be save
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 0.6.0 | 2026-08-19 | Chat replies arrive over a realtime connection. Echo uses `broadcasting.host` from login (`POST /api/plugin/token`); Save host also requests a matching realtime origin (`localhost:8081` or `ws.{saved hostname}`). | Draft |
 | 0.5.0 | 2026-08-14 | First private Chrome Web Store submission. Revision Assistant overlay, Content Studio login from the overlay or popup, draft edits including ACF standfirst/SEO fields. | Draft |
 
 ## Review Notes
@@ -248,7 +252,7 @@ The popup still opens. Without a host, login explains that a server must be save
 
 - Reviewers cannot fully test chat apply without a WordPress admin and a Content Studio host. Supply staging credentials if possible.
 - After the store assigns an item ID, Content Studio must allow `https://<ITEM_ID>.chromiumapp.org/` or login from the store build fails while unpacked-dev login still works.
-- `optional_host_permissions` are `http://*/*` and `https://*/*` so staff can point at local or production hosts. Install does not grant them; Save host requests one origin. Reviewers sometimes query broad optional hosts — use the justification table above.
+- `optional_host_permissions` are `http://*/*` and `https://*/*` so staff can point at local or production hosts. Install does not grant them; Save host requests the API origin and a guessed realtime origin (`localhost:8081` or `ws.{saved hostname}`) that must match `broadcasting.host` from login. Reviewers sometimes query broad optional hosts — use the justification table above.
 - Content scripts match all `/wp-admin/` hosts because brand WordPress sites are not a single domain. Chat still requires a saved host and a valid token before anything is sent.
 - The overlay does not appear on WordPress.com Calypso.
 - Store icon is the Immediate Media IM circle on a black square (`icons/icon-128.png`).

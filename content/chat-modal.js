@@ -13,6 +13,46 @@ const EDITOR_RESULT_EVENT = 'wpv-editor-result';
 const SNAPSHOT_TIMEOUT_MS = 4000;
 const APPLY_TIMEOUT_MS = 10000;
 const AUTH_KEYS = ['apiToken', 'apiUserName'];
+const PLUGIN_CHAT_RESULT_TIMEOUT_MS = 120000;
+const pluginChatResultWaiters = new Map();
+const pluginChatResultBuffer = new Map();
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== 'PLUGIN_CHAT_RESULT') return;
+
+  const requestId = message.request_id;
+  if (!requestId) return;
+
+  const waiter = pluginChatResultWaiters.get(requestId);
+  if (waiter) {
+    pluginChatResultWaiters.delete(requestId);
+    waiter(message);
+    return;
+  }
+
+  pluginChatResultBuffer.set(requestId, message);
+});
+
+function waitForPluginChatResult(requestId) {
+  const buffered = pluginChatResultBuffer.get(requestId);
+  if (buffered) {
+    pluginChatResultBuffer.delete(requestId);
+    return Promise.resolve(buffered);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pluginChatResultWaiters.delete(requestId);
+      reject(new Error('The assistant took too long to reply. Try again.'));
+    }, PLUGIN_CHAT_RESULT_TIMEOUT_MS);
+
+    pluginChatResultWaiters.set(requestId, (payload) => {
+      clearTimeout(timer);
+      resolve(payload);
+    });
+  });
+}
+
 const EDIT_KEYS = [
   'title',
   'content',
@@ -1619,12 +1659,22 @@ function bindComposer(root, initialAuth = {}) {
 
     let result;
     try {
-      result = await chrome.runtime.sendMessage({
+      const accepted = await chrome.runtime.sendMessage({
         type: 'PLUGIN_CHAT',
         message,
         history: transcript.slice(-MAX_HISTORY),
         article: compactArticle(article),
       });
+
+      if (!accepted?.ok) {
+        result = accepted || { ok: false, error: 'Chat failed.' };
+      } else if (accepted.accepted && accepted.request_id) {
+        result = await waitForPluginChatResult(accepted.request_id);
+      } else if (typeof accepted.reply === 'string') {
+        result = accepted;
+      } else {
+        result = { ok: false, error: 'Chat failed.' };
+      }
     } catch (err) {
       result = { ok: false, error: err.message || 'Chat failed.' };
     }

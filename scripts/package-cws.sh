@@ -19,9 +19,11 @@ zip -r "$output" \
   background \
   content \
   popup \
+  offscreen \
   icons \
   assets \
-  -x "*.DS_Store"
+  -x "*.DS_Store" \
+  -x "offscreen/src/*"
 
 echo "Packaged: $output ($(du -h "$output" | cut -f1))"
 echo "Upload this ZIP at https://chrome.google.com/webstore/devconsole"

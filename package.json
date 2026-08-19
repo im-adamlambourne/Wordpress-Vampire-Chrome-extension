@@ -1,0 +1,14 @@
+{
+  "name": "content-studio-plugin",
+  "private": true,
+  "scripts": {
+    "build:echo": "esbuild offscreen/src/echo-client.js --bundle --format=iife --outfile=offscreen/echo-client.js --platform=browser"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "laravel-echo": "^2.1.4",
+    "pusher-js": "^8.4.0"
+  }
+}

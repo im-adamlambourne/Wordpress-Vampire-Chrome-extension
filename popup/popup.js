@@ -78,7 +78,7 @@ async function loadCexAuth() {
     });
 
     if (response.status === 401) {
-      await chrome.storage.local.remove(['apiToken', 'apiUserName']);
+      await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
       syncAuthButtons(false);
       setCexStatus('signed-out', 'Session expired. Log in again.');
       return;
@@ -115,7 +115,7 @@ hostForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const granted = await chrome.permissions.request({ origins: [hostOriginPattern(host)] });
+  const granted = await chrome.permissions.request({ origins: pluginOptionalOrigins(host) });
   if (!granted) {
     setCexStatus('error', 'Host permission was not granted.');
     return;
@@ -123,7 +123,7 @@ hostForm.addEventListener('submit', async (event) => {
 
   const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
   if (previousHost && previousHost !== host) {
-    await chrome.storage.local.remove(['apiToken', 'apiUserName']);
+    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
   }
 
   await chrome.storage.local.set({ apiHost: host });

@@ -1,8 +1,17 @@
-async function sendPluginChat({ message, history, article }) {
+async function sendPluginChat({ message, history, article }, tabId) {
   const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
 
   if (!apiHost || !apiToken) {
     return { ok: false, error: 'Sign in via the Content Studio toolbar popup.' };
+  }
+
+  try {
+    await connectPluginEcho();
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message || 'Sign in again via the Content Studio toolbar popup to enable realtime chat.',
+    };
   }
 
   let payload;
@@ -23,11 +32,12 @@ async function sendPluginChat({ message, history, article }) {
     payload = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
-      await chrome.storage.local.remove(['apiToken', 'apiUserName']);
+      await clearPluginSession();
+      await disconnectPluginEcho();
       return { ok: false, error: 'Session expired. Sign in via the Content Studio toolbar popup.' };
     }
 
-    if (!response.ok || typeof payload.reply !== 'string') {
+    if (response.status !== 202 || typeof payload.request_id !== 'string') {
       throw new Error(
         payload.message
         || payload.errors?.message?.[0]
@@ -44,7 +54,8 @@ async function sendPluginChat({ message, history, article }) {
     return { ok: false, error: err.message || 'Chat failed.' };
   }
 
-  return { ok: true, reply: payload.reply, edits: normaliseEdits(payload.edits), title_variants: normaliseTitleVariants(payload.title_variants) };
+  await rememberPluginChatTab(payload.request_id, tabId);
+  return { ok: true, accepted: true, request_id: payload.request_id };
 }
 
 function normaliseTitleVariants(raw) {
@@ -77,12 +88,12 @@ function normaliseEdits(raw) {
   return edits;
 }
 
-function handlePluginChatMessage(message, sendResponse) {
+function handlePluginChatMessage(message, sender, sendResponse) {
   if (message?.type !== 'PLUGIN_CHAT') return false;
 
   (async () => {
     try {
-      sendResponse(await sendPluginChat(message));
+      sendResponse(await sendPluginChat(message, sender.tab?.id));
     } catch (err) {
       sendResponse({ ok: false, error: err.message || 'Chat failed.' });
     }

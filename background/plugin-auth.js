@@ -45,10 +45,47 @@ async function exchangePluginToken({ host, verifier, state, redirectUri, respons
     throw err;
   }
 
-  await chrome.storage.local.set({ apiHost: host, apiToken: payload.token });
-  await storePluginUserName(host, payload.token);
+  await persistPluginToken(host, payload);
+  try {
+    await connectPluginEcho();
+  } catch (err) {
+    console.warn('Could not open the realtime connection after login:', err.message);
+  }
   await chrome.storage.session.remove('pluginPkce');
   await announceLoginSuccess();
+}
+
+async function persistPluginToken(host, payload) {
+  const stored = {
+    apiHost: host,
+    apiToken: payload.token,
+  };
+
+  if (payload.user && typeof payload.user === 'object') {
+    if (payload.user.id != null) {
+      stored.apiUserId = Number(payload.user.id);
+    }
+    const name = payload.user.name || payload.user.email;
+    if (typeof name === 'string' && name.trim() !== '') {
+      stored.apiUserName = name.trim();
+    }
+  }
+
+  if (payload.broadcasting && typeof payload.broadcasting === 'object') {
+    stored.broadcasting = payload.broadcasting;
+  }
+
+  await chrome.storage.local.set(stored);
+
+  if (payload.user && typeof payload.user === 'object') {
+    return;
+  }
+
+  await storePluginUserName(host, payload.token);
+}
+
+async function clearPluginSession() {
+  await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
 }
 
 const LOGIN_NOTIFICATION_ID = 'plugin-login-success';
@@ -209,7 +246,8 @@ async function logoutPlugin() {
     }
   }
 
-  await chrome.storage.local.remove(['apiToken', 'apiUserName']);
+  await clearPluginSession();
+  await disconnectPluginEcho();
   return { ok: true };
 }
 

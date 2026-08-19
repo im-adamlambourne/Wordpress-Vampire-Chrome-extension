@@ -1,4 +1,4 @@
-importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js');
+importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
 
 const LIGHT_CONNECTED = '#22c55e';
 const LIGHT_DISCONNECTED = '#ef4444';
@@ -86,8 +86,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (handlePluginChatMessage(message, sendResponse)) {
+  if (handlePluginChatMessage(message, sender, sendResponse)) {
     return true;
+  }
+
+  if (handlePluginEchoMessage(message)) {
+    return;
   }
 
   const tabId = sender.tab?.id;
@@ -110,3 +114,28 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 });
 
 applyStatus(false);
+
+async function restorePluginEcho() {
+  try {
+    await connectPluginEcho();
+  } catch {
+    // Not signed in, or this session predates realtime chat.
+  }
+}
+
+chrome.runtime.onStartup.addListener(() => {
+  restorePluginEcho();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  restorePluginEcho();
+});
+
+restorePluginEcho();
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if (changes.apiToken && !changes.apiToken.newValue) {
+    disconnectPluginEcho();
+  }
+});

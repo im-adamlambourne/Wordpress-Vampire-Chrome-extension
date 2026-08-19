@@ -30,7 +30,7 @@
 </head>
 <body>
   <h1>Privacy Policy for Content Studio Plugin</h1>
-  <p class="meta">Last updated: 14 August 2026</p>
+  <p class="meta">Last updated: 19 August 2026</p>
   <p>
     Content Studio Plugin is a Chrome extension published by Immediate Media
     for staff use. It helps editors revise an open WordPress draft from a chat
@@ -44,8 +44,9 @@
     <li>
       <strong>Account details.</strong> After you sign in, the extension stores
       your display name (or email if no name is returned) so the chat overlay
-      can show your initials. It also stores an access token for your Content
-      Studio account.
+      can show your initials. It also stores an access token and a numeric
+      user id for your Content Studio account so replies can be delivered on
+      your private chat channel.
     </li>
     <li>
       <strong>Server address.</strong> The Content Studio host you enter in
@@ -73,14 +74,15 @@
   <h2>How data is stored</h2>
   <ul>
     <li>
-      Host, access token, and display name are stored in Chrome’s local
-      extension storage on your computer. They are not synced through your
-      Google account.
+      Host, access token, display name, user id, and public realtime
+      connection settings returned at login (host, port, and app key — never
+      the server secret) are stored in Chrome’s local extension storage on
+      your computer. They are not synced through your Google account.
     </li>
     <li>
-      Short-lived login values (proof-of-login secrets and a one-time success
-      message) are stored in Chrome session storage and are cleared when you
-      close the browser.
+      Short-lived login values (proof-of-login secrets, a one-time success
+      message, and which editor tab is waiting for a chat reply) are stored in
+      Chrome session storage and are cleared when you close the browser.
     </li>
     <li>
       Chat transcripts stay in memory for the open editor page and are not
@@ -100,12 +102,23 @@
   <h2>Where data is sent</h2>
   <p>
     The extension sends data only to the Content Studio origin you save in
-    Settings, after Chrome asks you to allow that origin. Typical requests are:
+    Settings, after Chrome asks you to allow that origin, and to the realtime
+    host that server returns when you sign in (locally a port on that same
+    machine, otherwise a <code>ws.</code> hostname of the same site). Save
+    host asks Chrome for that expected realtime origin before login exists
+    (<code>localhost:8081</code>, or <code>ws.</code> plus the hostname you
+    entered). Typical requests are:
   </p>
   <ul>
     <li>Sign-in (authorization code exchange) and sign-out</li>
     <li>Your profile name for the avatar</li>
-    <li>Chat messages and the draft snapshot</li>
+    <li>Chat messages and the draft snapshot (HTTP kick-off)</li>
+    <li>
+      A WebSocket to the realtime host returned at login so the assistant
+      reply, suggested edits, and headline ideas can arrive without keeping a
+      long HTTP request open
+    </li>
+    <li>Channel authorization for that private chat connection</li>
   </ul>
   <p>
     Your Content Studio server may use AI providers to generate replies,
@@ -122,10 +135,11 @@
 
   <h2>Third-party services</h2>
   <p>
-    Chrome provides the sign-in window and local storage. The only application
-    server the extension calls is the Content Studio host you configure.
-    There is no analytics, crash reporting, or advertising network in the
-    extension.
+    Chrome provides the sign-in window, local storage, and a background page
+    used only to keep the realtime connection alive. The only application
+    server the extension calls is the Content Studio host you configure, plus
+    the realtime host that host returns at login. There is no analytics, crash
+    reporting, or advertising network in the extension.
   </p>
 
   <h2>Data sharing</h2>
@@ -140,8 +154,8 @@
   <ul>
     <li>
       Click <strong>Log out</strong> in the toolbar popup to remove the access
-      token and display name from this browser. Changing the saved server host
-      also clears the token and name.
+      token, display name, user id, and realtime settings from this browser.
+      Changing the saved server host also clears those values.
     </li>
     <li>
       Removing the extension from Chrome deletes its local storage.
@@ -160,11 +174,12 @@
   <h2>Permissions in plain language</h2>
   <ul>
     <li><strong>Tabs</strong> — detect a WordPress admin tab so the icon can show connected or disconnected.</li>
-    <li><strong>Storage</strong> — remember your server, sign-in token, and display name.</li>
+    <li><strong>Storage</strong> — remember your server, sign-in token, display name, user id, and realtime settings.</li>
     <li><strong>Identity</strong> — open the Content Studio sign-in window and return you to the extension.</li>
     <li><strong>Notifications</strong> — confirm a successful login after the sign-in window closes.</li>
+    <li><strong>Offscreen documents</strong> — keep a quiet background page so chat replies can arrive after you send a message.</li>
     <li><strong>WordPress admin pages</strong> — show the revision overlay and read or update the open draft.</li>
-    <li><strong>Optional access to the server you choose</strong> — requested only when you save a host, so chat and login can reach that origin.</li>
+    <li><strong>Optional access to the server you choose</strong> — requested only when you save a host, so chat, login, and the realtime connection can reach that origin and the matching realtime host (local port 8081, or <code>ws.</code> plus that hostname).</li>
   </ul>
 
   <h2>Changes to this policy</h2>

@@ -43,3 +43,30 @@ function normalizeApiHost(value) {
 function hostOriginPattern(host) {
   return `${new URL(host).origin}/*`;
 }
+
+function reverbOriginPattern(host) {
+  const url = new URL(host);
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return 'http://localhost:8081/*';
+  }
+
+  return `https://ws.${url.hostname}/*`;
+}
+
+function pluginOptionalOrigins(host) {
+  return [hostOriginPattern(host), reverbOriginPattern(host)];
+}
+
+function reverbOriginFromBroadcasting(broadcasting) {
+  const scheme = broadcasting?.scheme === 'https' ? 'https' : 'http';
+  const host = broadcasting?.host;
+  const port = Number(broadcasting?.port);
+  if (!host) return null;
+  const defaultPort = scheme === 'https' ? 443 : 80;
+  if (!port || port === defaultPort) {
+    return `${scheme}://${host}/*`;
+  }
+  return `${scheme}://${host}:${port}/*`;
+}
+
+const PLUGIN_SESSION_KEYS = ['apiToken', 'apiUserName', 'apiUserId', 'broadcasting'];
