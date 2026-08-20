@@ -5084,7 +5084,7 @@
       forceTLS,
       encrypted: forceTLS,
       cluster: "",
-      enabledTransports: forceTLS ? ["wss"] : ["ws"],
+      enabledTransports: ["ws", "wss"],
       disableStats: true,
       namespace: false,
       authEndpoint: `${apiHost}/broadcasting/auth`,

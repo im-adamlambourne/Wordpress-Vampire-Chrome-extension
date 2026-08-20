@@ -50,6 +50,7 @@ async function connectEcho({ apiHost, apiToken, userId, broadcasting }) {
   const port = Number(broadcasting.port) || (broadcasting.scheme === 'https' ? 443 : 80);
   const forceTLS = broadcasting.scheme === 'https';
 
+  // Pusher-js's TLS socket is the "ws" transport; "wss" is only a non-TLS fallback.
   echo = new Echo({
     broadcaster: 'reverb',
     key: broadcasting.key,
@@ -59,7 +60,7 @@ async function connectEcho({ apiHost, apiToken, userId, broadcasting }) {
     forceTLS,
     encrypted: forceTLS,
     cluster: '',
-    enabledTransports: forceTLS ? ['wss'] : ['ws'],
+    enabledTransports: ['ws', 'wss'],
     disableStats: true,
     namespace: false,
     authEndpoint: `${apiHost}/broadcasting/auth`,
