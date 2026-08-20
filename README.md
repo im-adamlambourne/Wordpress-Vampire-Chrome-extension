@@ -17,7 +17,7 @@ The Laravel endpoints live in `content-exchange-v2` — see
 
 The popup (toolbar icon) is the sign-in screen. Open **Settings** (cog) to set the Laravel **Server** and inspect the WordPress session dump.
 
-1. Open the popup → **Settings** (cog) → set **Server** to the Laravel origin (this Sail app is often `http://localhost` on port 80; some READMEs say `http://localhost:8080`). Start Reverb locally with `docker compose exec laravel.test php artisan reverb:start` (host port **8081**).
+1. Open the popup → **Settings** (cog) → set **Server** to the Laravel origin (this Sail app is often `http://localhost` on port 80; some READMEs say `http://localhost:8080`). Start Reverb locally with `docker compose exec laravel.test php artisan reverb:start` (host port **8081**) and a `generative` worker (`docker compose exec laravel.test php artisan horizon`, or `queue:work --queue=generative`). With `QUEUE_CONNECTION=sync`, chat POST waits on Flash instead of returning 202 immediately.
 2. **Save host** and allow the API origin and the realtime origin when Chrome asks. Save host only requests permission: `http://localhost:8081` for a local server, or `https://ws.{hostname}` for any other saved host. Echo itself does not use that guess — after login it uses `broadcasting.host` from `POST /api/plugin/token` (Laravel derives the same `localhost:8081` / `ws.{API host}` unless `PLUGIN_REVERB_*` overrides it).
 3. Close Settings, then **Log in** in the popup (or **Sign in** in the editor overlay). Chrome opens the sign-in window. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**. Sessions saved before 0.6.0 must log in again.
 4. The popup closes during the bounce. A Chrome notification should confirm the login, and the plugin popup should reopen with **Successfully logged in as {name}**. Clicking the notification also opens the popup.
@@ -52,7 +52,7 @@ Editor chat (signed in)
   → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
   → PLUGIN_CHAT
   → service worker POST {host}/api/plugin/chat → 202 request_id
-  → Laravel ProcessPluginChat after the HTTP response
+  → Laravel ProcessPluginChatJob on the generative queue
   → Reverb PluginChatReplied / PluginChatFailed
   → offscreen Echo → PLUGIN_CHAT_RESULT → overlay (reply sound)
   → non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data, Classic/TinyMCE, Yoast/Rank Math, and matching ACF fields)
