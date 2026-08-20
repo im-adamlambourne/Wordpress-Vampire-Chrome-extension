@@ -51,7 +51,7 @@ Reopen popup
 Editor chat (signed in)
   → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
   → PLUGIN_CHAT
-  → service worker POST {host}/api/plugin/chat → 202 request_id
+  → service worker POST {host}/api/plugin/chat (message, draft snapshot, telemetry) → 202 request_id
   → Laravel ProcessPluginChatJob on the generative queue
   → Reverb PluginChatReplied / PluginChatFailed
   → offscreen Echo → PLUGIN_CHAT_RESULT → overlay (reply sound)

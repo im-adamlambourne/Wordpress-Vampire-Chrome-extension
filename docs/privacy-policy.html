@@ -30,7 +30,7 @@
 </head>
 <body>
   <h1>Privacy Policy for Content Studio Plugin</h1>
-  <p class="meta">Last updated: 19 August 2026</p>
+  <p class="meta">Last updated: 20 August 2026</p>
   <p>
     Content Studio Plugin is a Chrome extension published by Immediate Media
     for staff use. It helps editors revise an open WordPress draft from a chat
@@ -65,6 +65,13 @@
       page and to show a connected or disconnected toolbar icon. It does not
       keep a browsing history.
     </li>
+    <li>
+      <strong>Device environment.</strong> When you send a chat message, the
+      extension also sends the operating system name and version, the browser
+      brand and version, and this extension’s version to your Content Studio
+      server so support and product analytics can tell which client you used.
+      That data is not used for advertising.
+    </li>
   </ul>
   <p>
     The extension does not collect health or financial information, does not
@@ -95,6 +102,7 @@
     <li>Sign you in to Content Studio and keep you signed in until you log out or the session expires.</li>
     <li>Show your name or initials in the toolbar popup and chat overlay.</li>
     <li>Send your prompt and draft snapshot to Content Studio so the assistant can suggest revisions.</li>
+    <li>Record the client operating system, browser, and extension version with each chat turn so Content Studio can support the plugin.</li>
     <li>Apply suggested edits to the open WordPress editor. The extension does not save or publish the post.</li>
     <li>Show a login-success notification after you connect your account.</li>
   </ul>
@@ -112,7 +120,7 @@
   <ul>
     <li>Sign-in (authorization code exchange) and sign-out</li>
     <li>Your profile name for the avatar</li>
-    <li>Chat messages and the draft snapshot (HTTP kick-off)</li>
+    <li>Chat messages, the draft snapshot, and device environment (OS, browser, and extension version) on the HTTP kick-off</li>
     <li>
       A WebSocket to the realtime host returned at login so the assistant
       reply, suggested edits, and headline ideas can arrive without keeping a

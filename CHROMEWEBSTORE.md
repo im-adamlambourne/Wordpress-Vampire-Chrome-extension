@@ -145,7 +145,7 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 | Personal communications | Yes | Yes — chat message, recent overlay transcript, and assistant replies via the configured host (HTTP kick-off plus a realtime connection for the reply) | Generate revision suggestions | No, other than the user’s Content Studio server (which may call Immediate Media’s AI providers) |
 | Location | No | No | — | — |
 | Web history | No | No | Tab URL is read only to detect wp-admin for the toolbar light; not stored as history | — |
-| User activity | Yes | Yes — sending a chat turn | Operate the revision assistant | No, other than the user’s Content Studio server |
+| User activity | Yes | Yes — sending a chat turn, plus OS, browser, and extension version | Operate the revision assistant and record which client sent the turn | No, other than the user’s Content Studio server |
 | Website content | Yes | Yes — draft snapshot (title, body, excerpt, SEO/OG text, keyphrase, selection) when the user sends a message | Ground replies and apply edits to the open editor | No, other than the user’s Content Studio server |
 
 Dashboard checkboxes to tick **Yes** for: personally identifiable info, authentication info, personal communications, user activity, website content.

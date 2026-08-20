@@ -1,3 +1,78 @@
+function assignTelemetryValue(target, key, value) {
+  if (typeof value === 'string' && value.trim() !== '') {
+    target[key] = value.trim();
+  }
+}
+
+function pickBrowserBrand(brands) {
+  if (!Array.isArray(brands)) return null;
+  const preferred = brands.find((item) => item && /Google Chrome|Microsoft Edge|Brave|Opera/i.test(item.brand));
+  if (preferred) return preferred;
+  return brands.find((item) => item && item.brand && !/^Not.?A.?Brand/i.test(item.brand)) || null;
+}
+
+function fillTelemetryFromUserAgent(telemetry) {
+  const ua = typeof navigator.userAgent === 'string' ? navigator.userAgent : '';
+  if (!telemetry.browser) {
+    const edge = ua.match(/Edg\/([\d.]+)/);
+    const chrome = ua.match(/Chrome\/([\d.]+)/);
+    if (edge) {
+      telemetry.browser = 'Microsoft Edge';
+      telemetry.browser_version = edge[1];
+    } else if (chrome) {
+      telemetry.browser = 'Google Chrome';
+      telemetry.browser_version = chrome[1];
+    }
+  }
+  if (telemetry.os) {
+    return;
+  }
+  if (/Mac OS X/.test(ua)) {
+    telemetry.os = 'macOS';
+    const mac = ua.match(/Mac OS X ([\d_]+)/);
+    if (mac) telemetry.os_version = mac[1].replaceAll('_', '.');
+  } else if (/Windows NT/.test(ua)) {
+    telemetry.os = 'Windows';
+    const win = ua.match(/Windows NT ([\d.]+)/);
+    if (win) telemetry.os_version = win[1];
+  } else if (/Linux/.test(ua)) {
+    telemetry.os = 'Linux';
+  }
+}
+
+async function collectPluginTelemetry() {
+  const telemetry = {};
+  try {
+    assignTelemetryValue(telemetry, 'extension_version', chrome.runtime.getManifest()?.version);
+  } catch {
+    // Manifest should always be readable in the service worker.
+  }
+
+  const uaData = navigator.userAgentData;
+  if (uaData && typeof uaData.getHighEntropyValues === 'function') {
+    try {
+      const hints = await uaData.getHighEntropyValues([
+        'platform',
+        'platformVersion',
+        'fullVersionList',
+      ]);
+      assignTelemetryValue(telemetry, 'os', hints.platform || uaData.platform);
+      assignTelemetryValue(telemetry, 'os_version', hints.platformVersion);
+      const brand = pickBrowserBrand(hints.fullVersionList || uaData.brands);
+      if (brand) {
+        assignTelemetryValue(telemetry, 'browser', brand.brand);
+        assignTelemetryValue(telemetry, 'browser_version', brand.version);
+      }
+    } catch {
+      // High-entropy hints can be denied; the user-agent string fills gaps below.
+    }
+  }
+
+  fillTelemetryFromUserAgent(telemetry);
+
+  return telemetry;
+}
+
 async function sendPluginChat({ message, history, article }, tabId) {
   const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
 
@@ -16,6 +91,7 @@ async function sendPluginChat({ message, history, article }, tabId) {
 
   let payload;
   try {
+    const telemetry = await collectPluginTelemetry();
     const response = await fetch(`${apiHost}/api/plugin/chat`, {
       method: 'POST',
       headers: {
@@ -27,6 +103,7 @@ async function sendPluginChat({ message, history, article }, tabId) {
         message,
         history,
         article,
+        ...(Object.keys(telemetry).length > 0 ? { telemetry } : {}),
       }),
     });
     payload = await response.json().catch(() => ({}));
