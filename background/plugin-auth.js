@@ -110,7 +110,7 @@ async function notifyLoginSuccess(message) {
     await chrome.notifications.create(LOGIN_NOTIFICATION_ID, {
       type: 'basic',
       iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
-      title: 'Content Studio Plugin',
+      title: 'Content Studio',
       message,
     });
   } catch (err) {
@@ -138,8 +138,8 @@ async function openPluginPopup() {
       url: chrome.runtime.getURL(POPUP_PATH),
       type: 'popup',
       focused: true,
-      width: 400,
-      height: 280,
+      width: 800,
+      height: 600,
       ...position,
     });
   } catch (err) {

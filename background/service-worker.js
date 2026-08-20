@@ -64,7 +64,7 @@ async function applyStatus(connected, tabId) {
       ...target,
     });
     await chrome.action.setTitle({
-      title: connected ? 'Content Studio Plugin — connected' : 'Content Studio Plugin — disconnected',
+      title: connected ? 'Content Studio — connected' : 'Content Studio — disconnected',
       ...target,
     });
   } catch (err) {

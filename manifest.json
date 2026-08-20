@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Content Studio Plugin",
-  "version": "0.6.0",
-  "description": "Revise WordPress drafts from a chat overlay: title, body, excerpt, SEO, Open Graph, and focus keyphrase.",
+  "name": "Content Studio",
+  "version": "0.7.0",
+  "description": "Revise WordPress drafts from a chat overlay, and open your Content Studio Workspace features from the toolbar.",
   "permissions": ["tabs", "storage", "identity", "notifications", "offscreen"],
   "host_permissions": ["*://*/wp-admin/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
@@ -13,7 +13,7 @@
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Content Studio Plugin",
+    "default_title": "Content Studio",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",

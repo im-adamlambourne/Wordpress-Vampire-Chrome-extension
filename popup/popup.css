@@ -53,9 +53,8 @@ body {
 }
 
 body {
-  width: 400px;
+  width: 800px;
   min-height: 220px;
-  max-height: 600px;
   font-family: system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.4;
@@ -68,6 +67,7 @@ body:has(#settings-dialog[open]) {
   height: 600px;
   min-height: 600px;
   max-height: 600px;
+  overflow: hidden;
 }
 
 ::selection {
@@ -84,7 +84,7 @@ header {
   color: white;
 }
 
-header > div {
+.header-title {
   flex: 1;
   min-width: 0;
 }
@@ -105,11 +105,28 @@ header h1 {
   text-transform: uppercase;
 }
 
-header p {
-  margin: 2px 0 0;
-  color: var(--color-ice);
-  font-size: 12px;
-  font-weight: 500;
+.header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  min-width: 0;
+}
+
+#account-name {
+  margin: 0;
+  max-inline-size: 14rem;
+  overflow: hidden;
+  color: white;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#account-name[hidden] {
+  display: none;
 }
 
 main {
@@ -118,6 +135,112 @@ main {
 
 #cex-auth {
   margin: 0;
+}
+
+#cex-auth[hidden] + #workspace-features:not([hidden]) {
+  margin-top: 0;
+  padding-top: 0;
+  border-block-start: 0;
+}
+
+#workspace-features {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.workspace-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.workspace-heading-row h2 {
+  margin: 0;
+}
+
+#workspace-site-name {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 650;
+  text-align: end;
+}
+
+#workspace-status,
+#workspace-empty {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px 6px;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.feature-button:hover {
+  background: light-dark(oklch(95% 0.02 230), oklch(32% 0.05 250));
+  filter: none;
+}
+
+.feature-button:hover .feature-plaque {
+  transform: translateY(-2px);
+}
+
+.feature-plaque {
+  display: grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  border-radius: 16px;
+  color: var(--feature-accent, var(--color-mid));
+  background: linear-gradient(
+    to bottom,
+    light-dark(oklch(100% 0.01 230), oklch(40% 0.05 250)),
+    light-dark(oklch(96% 0.015 230), oklch(30% 0.045 250))
+  );
+  box-shadow:
+    0 4px 10px light-dark(oklch(28% 0.06 250 / 0.12), oklch(0% 0 0 / 0.28)),
+    inset 0 0 0 1px color-mix(in srgb, var(--feature-accent, var(--color-mid)) 28%, transparent);
+  transition: transform 0.2s ease;
+}
+
+.feature-glyph {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+}
+
+.feature-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: clip;
+  max-inline-size: 100%;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 #cex-status {
@@ -195,20 +318,52 @@ main {
   display: block;
 }
 
-.cex-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+#workspace-site-section {
+  margin: 0 0 16px;
 }
 
-.cex-actions #cex-login[hidden],
-.cex-actions #cex-logout[hidden] {
+#workspace-site-section[hidden] {
   display: none;
+  margin: 0;
 }
 
-.cex-actions:has(#cex-login[hidden]),
-.cex-actions:has(#cex-logout[hidden]) {
-  grid-template-columns: 1fr;
+#workspace-site-form {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+#workspace-site-form label {
+  font-size: 11px;
+  font-weight: 700;
+  font-stretch: condensed;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+#workspace-site-select {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+}
+
+#workspace-site-select:focus-visible {
+  outline: 2px solid var(--color-sky);
+  outline-offset: 2px;
+}
+
+.cex-actions {
+  margin-block-start: 14px;
+}
+
+.cex-actions:has(#cex-login[hidden]) {
+  display: none;
 }
 
 #connection-status {
@@ -294,16 +449,9 @@ h4 {
 }
 
 .field-scroller {
-  max-height: 360px;
-  overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-panel);
-}
-
-.field-scroller:focus-visible {
-  outline: 2px solid var(--color-sky);
-  outline-offset: 2px;
 }
 
 table {
@@ -366,7 +514,7 @@ button {
   cursor: pointer;
 }
 
-button:not(.icon-button) {
+button:not(.icon-button):not(.feature-button) {
   width: 100%;
   min-height: 40px;
   padding: 10px 12px;
@@ -379,7 +527,7 @@ button:not(.icon-button) {
   text-transform: uppercase;
 }
 
-button:not(.icon-button):hover {
+button:not(.icon-button):not(.feature-button):hover {
   filter: brightness(1.08);
 }
 
@@ -404,7 +552,6 @@ button.secondary:hover {
   flex: none;
   align-items: center;
   justify-content: center;
-  margin-inline-start: auto;
   width: 36px;
   height: 36px;
   padding: 0;
@@ -415,6 +562,42 @@ button.secondary:hover {
 
 .icon-button:hover {
   background: rgb(255 255 255 / 0.16);
+}
+
+.icon-button[hidden] {
+  display: none;
+}
+
+#logout-dialog {
+  width: min(22rem, calc(100% - 2rem));
+  margin: auto;
+  padding: 18px 16px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  box-shadow: 0 16px 40px rgb(2 34 64 / 0.28);
+}
+
+#logout-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+#logout-dialog p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-block-start: 14px;
+}
+
+#logout-dialog::backdrop {
+  background: rgb(2 34 64 / 0.45);
 }
 
 #settings-dialog {
@@ -456,6 +639,14 @@ button.secondary:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .feature-plaque {
+    transition: none;
+  }
+
+  .feature-button:hover .feature-plaque {
+    transform: none;
+  }
+
   #settings-dialog {
     transform: none;
     transition: opacity 0.15s ease;
@@ -490,19 +681,114 @@ button.secondary:hover {
 }
 
 .settings-scroller {
-  flex: 1;
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 14px 16px 16px;
 }
 
-.settings-scroller:focus-visible {
+.settings-scroller > :not(#advanced-settings) {
+  flex-shrink: 0;
+}
+
+#advanced-settings {
+  flex: none;
+  min-height: 0;
+}
+
+#advanced-settings[open] {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#advanced-settings[open]::details-content {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#advanced-settings > summary {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-weight: 800;
+  font-stretch: condensed;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+#advanced-settings > summary::-webkit-details-marker,
+#advanced-settings > summary::marker {
+  display: none;
+  content: none;
+}
+
+#advanced-settings > summary:hover {
+  background: var(--color-status-bg);
+}
+
+#advanced-settings > summary:focus-visible {
   outline: 2px solid var(--color-sky);
-  outline-offset: -2px;
+  outline-offset: 2px;
+}
+
+.advanced-label-hide {
+  display: none;
+}
+
+#advanced-settings[open] .advanced-label-show {
+  display: none;
+}
+
+#advanced-settings[open] .advanced-label-hide {
+  display: inline;
+}
+
+.advanced-settings-panel {
+  display: grid;
+  flex: 1 1 0%;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  margin-block-start: 16px;
+  overflow: hidden;
+}
+
+#advanced-settings:not([open]) .advanced-settings-panel {
+  display: none;
+}
+
+#host-section {
+  min-height: 0;
 }
 
 #debug-section {
+  min-height: 0;
   margin: 16px 0 0;
   padding: 16px 0 0;
   border-block-start: 1px solid var(--color-border);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+#debug-section:focus-visible {
+  outline: 2px solid var(--color-sky);
+  outline-offset: -2px;
 }

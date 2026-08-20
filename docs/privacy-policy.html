@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy — Content Studio Plugin</title>
+  <title>Privacy Policy — Content Studio</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -29,10 +29,10 @@
   </style>
 </head>
 <body>
-  <h1>Privacy Policy for Content Studio Plugin</h1>
+  <h1>Privacy Policy for Content Studio</h1>
   <p class="meta">Last updated: 20 August 2026</p>
   <p>
-    Content Studio Plugin is a Chrome extension published by Immediate Media
+    Content Studio is a Chrome extension published by Immediate Media
     for staff use. It helps editors revise an open WordPress draft from a chat
     overlay. This policy describes what the extension stores on the device and
     what it sends to the Content Studio server you configure.
@@ -60,10 +60,18 @@
       configured Content Studio server so it can reply and suggest edits.
     </li>
     <li>
-      <strong>Current WordPress admin tab.</strong> The extension reads the
-      active tab’s address only to detect whether you are on a WordPress admin
-      page and to show a connected or disconnected toolbar icon. It does not
-      keep a browsing history.
+      <strong>Current browser tab.</strong> The extension reads the
+      active tab’s address to detect whether you are on a WordPress admin
+      page, to show a connected or disconnected toolbar icon, and — when you
+      are signed in — to send that address to your Content Studio server so
+      the toolbar popup can show the Workspace features for the matching
+      assigned site. It does not keep a browsing history.
+    </li>
+    <li>
+      <strong>Workspace features.</strong> When the toolbar popup is open
+      while you are signed in, the extension asks your Content Studio server
+      which Workspace sites and features you can use, then shows those
+      buttons. Clicking a button opens Content Studio Workspace in a new tab.
     </li>
     <li>
       <strong>Device environment.</strong> When you send a chat message, the
@@ -161,9 +169,10 @@
   <h2>Data retention and deletion</h2>
   <ul>
     <li>
-      Click <strong>Log out</strong> in the toolbar popup to remove the access
-      token, display name, user id, and realtime settings from this browser.
-      Changing the saved server host also clears those values.
+      Click the user icon next to Settings in the toolbar popup to log out. That
+      removes the access token, display name, user id, and realtime settings
+      from this browser. Changing the saved server host also clears those
+      values.
     </li>
     <li>
       Removing the extension from Chrome deletes its local storage.

@@ -4,16 +4,29 @@ const fieldsSection = document.getElementById('fields-section');
 const fieldsCaption = document.getElementById('fields-caption');
 const fieldRows = document.getElementById('field-rows');
 const refreshBtn = document.getElementById('refresh');
+const cexAuthEl = document.getElementById('cex-auth');
 const cexStatusEl = document.getElementById('cex-status');
 const hostForm = document.getElementById('cex-host-form');
 const hostInput = document.getElementById('cex-host');
 const loginBtn = document.getElementById('cex-login');
-const logoutBtn = document.getElementById('cex-logout');
+const accountNameEl = document.getElementById('account-name');
+const accountBtn = document.getElementById('account-button');
+const logoutDialog = document.getElementById('logout-dialog');
+const logoutConfirmBtn = document.getElementById('logout-confirm');
 const settingsDialog = document.getElementById('settings-dialog');
 const openSettingsBtn = document.getElementById('open-settings');
 const closeSettingsBtn = document.getElementById('close-settings');
+const workspaceSection = document.getElementById('workspace-features');
+const workspaceSiteSection = document.getElementById('workspace-site-section');
+const workspaceSiteForm = document.getElementById('workspace-site-form');
+const workspaceSiteName = document.getElementById('workspace-site-name');
+const workspaceSiteSelect = document.getElementById('workspace-site-select');
+const workspaceStatus = document.getElementById('workspace-status');
+const workspaceEmpty = document.getElementById('workspace-empty');
+const workspaceGrid = document.getElementById('workspace-grid');
 
 let pendingPkce = null;
+let workspaceCatalog = { selected_site_id: null, sites: [] };
 
 async function refreshPkce() {
   pendingPkce = await generatePkce();
@@ -24,11 +37,43 @@ refreshPkce();
 function setCexStatus(state, message) {
   cexStatusEl.dataset.state = state;
   cexStatusEl.textContent = message;
+  cexAuthEl.hidden = !message;
 }
 
-function syncAuthButtons(signedIn) {
+function syncAccountHeader(signedIn, name = '') {
   loginBtn.hidden = signedIn;
-  logoutBtn.hidden = !signedIn;
+  accountBtn.hidden = !signedIn;
+  accountNameEl.hidden = !signedIn || !name;
+  accountNameEl.textContent = name;
+  accountBtn.setAttribute('aria-label', name ? `Log out ${name}` : 'Log out');
+}
+
+function setLogoutExpanded(open) {
+  accountBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function enableLightDismiss(dialog) {
+  if ('closedBy' in HTMLDialogElement.prototype) {
+    return;
+  }
+
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog) {
+      return;
+    }
+
+    const rect = dialog.getBoundingClientRect();
+    const inContent =
+      rect.top <= event.clientY &&
+      event.clientY <= rect.top + rect.height &&
+      rect.left <= event.clientX &&
+      event.clientX <= rect.left + rect.width;
+    if (inContent) {
+      return;
+    }
+
+    dialog.close();
+  });
 }
 
 function syncHostAria(event) {
@@ -50,24 +95,30 @@ hostInput.addEventListener('input', (event) => {
 });
 
 async function loadCexAuth() {
-  const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
+  const { apiHost, apiToken, apiUserName } = await chrome.storage.local.get([
+    'apiHost',
+    'apiToken',
+    'apiUserName',
+  ]);
   if (apiHost) {
     hostInput.value = apiHost;
   }
 
-  syncAuthButtons(Boolean(apiToken));
+  syncAccountHeader(Boolean(apiToken), apiUserName || '');
 
   if (!apiHost) {
     setCexStatus('signed-out', 'Open settings to save a server URL, then log in.');
+    hideWorkspace();
     return;
   }
 
   if (!apiToken) {
     setCexStatus('signed-out', 'Not signed in.');
+    hideWorkspace();
     return;
   }
 
-  setCexStatus('checking', 'Checking session…');
+  setCexStatus('checking', apiUserName ? '' : 'Checking session…');
 
   try {
     const response = await fetch(`${apiHost}/api/plugin/me`, {
@@ -79,8 +130,9 @@ async function loadCexAuth() {
 
     if (response.status === 401) {
       await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
-      syncAuthButtons(false);
+      syncAccountHeader(false);
       setCexStatus('signed-out', 'Session expired. Log in again.');
+      hideWorkspace();
       return;
     }
 
@@ -95,10 +147,12 @@ async function loadCexAuth() {
     if (loginSuccessMessage) {
       await chrome.storage.session.remove('loginSuccessMessage');
     }
-    setCexStatus('signed-in', loginSuccessMessage || `Signed in as ${name}`);
-    syncAuthButtons(true);
+    syncAccountHeader(true, name);
+    setCexStatus('signed-in', loginSuccessMessage || '');
+    await loadWorkspaceFeatures();
   } catch (err) {
     setCexStatus('error', err.message || 'Could not reach the server.');
+    hideWorkspace();
   }
 }
 
@@ -172,12 +226,43 @@ loginBtn.addEventListener('click', async () => {
   }
 });
 
-logoutBtn.addEventListener('click', async () => {
+if (!('commandForElement' in HTMLButtonElement.prototype)) {
+  accountBtn.addEventListener('click', () => {
+    if (!logoutDialog.open) {
+      logoutDialog.showModal();
+    }
+    setLogoutExpanded(true);
+  });
+} else {
+  accountBtn.addEventListener('click', () => {
+    setLogoutExpanded(true);
+  });
+}
+
+enableLightDismiss(logoutDialog);
+
+let logoutPending = false;
+
+logoutConfirmBtn.addEventListener('click', async () => {
+  logoutPending = true;
+  logoutDialog.close();
   try {
     await chrome.runtime.sendMessage({ type: 'PLUGIN_LOGOUT' });
     await loadCexAuth();
+    if (!loginBtn.hidden) {
+      loginBtn.focus();
+    }
   } catch (err) {
     setCexStatus('error', err.message || 'Logout failed.');
+  } finally {
+    logoutPending = false;
+  }
+});
+
+logoutDialog.addEventListener('close', () => {
+  setLogoutExpanded(false);
+  if (!logoutPending && !accountBtn.hidden) {
+    accountBtn.focus();
   }
 });
 
@@ -185,6 +270,201 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.apiToken || changes.apiHost)) {
     loadCexAuth();
   }
+});
+
+function hideWorkspace() {
+  workspaceSection.hidden = true;
+  workspaceSiteSection.hidden = true;
+  workspaceGrid.replaceChildren();
+  workspaceEmpty.hidden = true;
+  workspaceStatus.hidden = true;
+  workspaceSiteSelect.replaceChildren();
+  workspaceSiteName.textContent = '';
+}
+
+async function activeTabHttpUrl() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url;
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function glyphFromMarkup(markup) {
+  if (typeof markup !== 'string' || markup.trim() === '') return null;
+  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml');
+  if (parsed.querySelector('parsererror')) return null;
+  const svg = parsed.documentElement;
+  if (svg.namespaceURI !== 'http://www.w3.org/2000/svg' || svg.localName !== 'svg') {
+    return null;
+  }
+  svg.setAttribute('class', 'feature-glyph');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  return document.importNode(svg, true);
+}
+
+function catalogSites() {
+  return Array.isArray(workspaceCatalog.sites) ? workspaceCatalog.sites : [];
+}
+
+function selectedWorkspaceSite() {
+  const sites = catalogSites();
+  if (sites.length === 0) return null;
+  const selectedId = Number(workspaceSiteSelect.value || workspaceCatalog.selected_site_id);
+  return sites.find((site) => Number(site.id) === selectedId) || sites[0];
+}
+
+function renderWorkspaceGrid(site) {
+  workspaceGrid.replaceChildren();
+  const features = Array.isArray(site?.features) ? site.features : [];
+  if (!site || features.length === 0) {
+    workspaceEmpty.hidden = false;
+    workspaceEmpty.textContent = site
+      ? `No Workspace features are enabled for ${site.name}.`
+      : 'No Workspace features are enabled for your assigned sites.';
+    return;
+  }
+
+  workspaceEmpty.hidden = true;
+
+  for (const feature of features) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'feature-button';
+    button.title = feature.description || feature.name;
+    button.setAttribute('aria-label', `Open ${feature.name} in Workspace`);
+
+    const plaque = document.createElement('span');
+    plaque.className = 'feature-plaque';
+    plaque.style.setProperty('--feature-accent', feature.accent || '#94a3b8');
+
+    const glyph = glyphFromMarkup(feature.glyph);
+    if (glyph) {
+      plaque.append(glyph);
+    }
+
+    const label = document.createElement('span');
+    label.className = 'feature-label';
+    label.textContent = feature.name;
+
+    button.append(plaque, label);
+    button.addEventListener('click', () => {
+      openWorkspaceFeature(site, feature);
+    });
+    item.append(button);
+    workspaceGrid.append(item);
+  }
+}
+
+function applySelectedWorkspaceSite() {
+  const site = selectedWorkspaceSite();
+  workspaceSiteName.textContent = site?.name || '';
+  renderWorkspaceGrid(site);
+}
+
+function renderWorkspaceCatalog() {
+  const sites = catalogSites();
+  workspaceStatus.hidden = true;
+  workspaceSection.hidden = false;
+
+  if (sites.length === 0) {
+    workspaceSiteSection.hidden = true;
+    workspaceSiteSelect.replaceChildren();
+    workspaceSiteName.textContent = '';
+    renderWorkspaceGrid(null);
+    return;
+  }
+
+  const previous = workspaceSiteSelect.value;
+  workspaceSiteSelect.replaceChildren();
+  for (const site of sites) {
+    const option = document.createElement('option');
+    option.value = String(site.id);
+    option.textContent = site.name;
+    workspaceSiteSelect.append(option);
+  }
+
+  const preferred = previous || String(workspaceCatalog.selected_site_id ?? sites[0].id);
+  workspaceSiteSelect.value = sites.some((site) => String(site.id) === preferred)
+    ? preferred
+    : String(sites[0].id);
+
+  workspaceSiteSection.hidden = sites.length < 2;
+  applySelectedWorkspaceSite();
+}
+
+async function openWorkspaceFeature(site, feature) {
+  const { apiHost } = await chrome.storage.local.get('apiHost');
+  if (!apiHost) return;
+  const path = feature?.url || site?.url || '/workspace';
+  const url = new URL(path, apiHost).toString();
+  await chrome.tabs.create({ url });
+}
+
+async function loadWorkspaceFeatures() {
+  const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
+  if (!apiHost || !apiToken) {
+    hideWorkspace();
+    return;
+  }
+
+  workspaceSection.hidden = false;
+  workspaceStatus.hidden = false;
+  workspaceStatus.textContent = 'Loading Workspace features…';
+  workspaceEmpty.hidden = true;
+  workspaceGrid.replaceChildren();
+  workspaceSiteSection.hidden = true;
+  workspaceSiteName.textContent = '';
+
+  try {
+    const tabUrl = await activeTabHttpUrl();
+    const endpoint = new URL('/api/plugin/workspace', apiHost);
+    if (tabUrl) {
+      endpoint.searchParams.set('url', tabUrl);
+    }
+
+    const response = await fetch(endpoint, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiToken}`,
+      },
+    });
+
+    if (response.status === 401) {
+      hideWorkspace();
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Could not load Workspace features (${response.status}).`);
+    }
+
+    const payload = await response.json();
+    workspaceCatalog = {
+      selected_site_id: payload?.selected_site_id ?? null,
+      sites: Array.isArray(payload?.sites) ? payload.sites : [],
+    };
+    renderWorkspaceCatalog();
+  } catch (err) {
+    workspaceStatus.hidden = false;
+    workspaceStatus.textContent = err.message || 'Could not load Workspace features.';
+  }
+}
+
+workspaceSiteForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+});
+
+workspaceSiteSelect.addEventListener('change', () => {
+  applySelectedWorkspaceSite();
 });
 
 function isWpAdminUrl(url) {
