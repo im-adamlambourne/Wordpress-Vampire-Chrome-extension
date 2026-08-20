@@ -559,7 +559,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   flex: 1;
   min-width: 0;
   padding: 0.5rem 0.75rem;
-  border: 1px solid rgb(255 255 255 / 0.2);
+  border: 1px solid var(--brand-600);
   border-radius: 0.75rem;
   background: var(--ws-well-4);
   color: #fff;
