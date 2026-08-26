@@ -94,23 +94,31 @@ hostInput.addEventListener('input', (event) => {
   }
 });
 
+async function grantAndSaveHost(host) {
+  const granted = await chrome.permissions.request({ origins: pluginOptionalOrigins(host) });
+  if (!granted) {
+    return { granted: false };
+  }
+
+  const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
+  if (previousHost && previousHost !== host) {
+    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
+  }
+
+  await chrome.storage.local.set({ apiHost: host });
+  hostInput.value = host;
+  return { granted: true, previousHost };
+}
+
 async function loadCexAuth() {
-  const { apiHost, apiToken, apiUserName } = await chrome.storage.local.get([
-    'apiHost',
+  const apiHost = await ensureApiHost();
+  const { apiToken, apiUserName } = await chrome.storage.local.get([
     'apiToken',
     'apiUserName',
   ]);
-  if (apiHost) {
-    hostInput.value = apiHost;
-  }
+  hostInput.value = apiHost;
 
   syncAccountHeader(Boolean(apiToken), apiUserName || '');
-
-  if (!apiHost) {
-    setCexStatus('signed-out', 'Open settings to save a server URL, then log in.');
-    hideWorkspace();
-    return;
-  }
 
   if (!apiToken) {
     setCexStatus('signed-out', 'Not signed in.');
@@ -169,19 +177,12 @@ hostForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const granted = await chrome.permissions.request({ origins: pluginOptionalOrigins(host) });
+  const { granted, previousHost } = await grantAndSaveHost(host);
   if (!granted) {
     setCexStatus('error', 'Host permission was not granted.');
     return;
   }
 
-  const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
-  if (previousHost && previousHost !== host) {
-    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
-  }
-
-  await chrome.storage.local.set({ apiHost: host });
-  hostInput.value = host;
   await loadCexAuth();
   if (!previousHost || previousHost !== host) {
     setCexStatus('signed-out', 'Host saved. Log in to connect.');
@@ -191,9 +192,15 @@ hostForm.addEventListener('submit', async (event) => {
 loginBtn.addEventListener('click', async () => {
   let host;
   try {
-    host = normalizeApiHost(hostInput.value);
+    host = normalizeApiHost(hostInput.value || DEFAULT_API_HOST);
   } catch (err) {
     setCexStatus('error', err.message);
+    return;
+  }
+
+  const { granted } = await grantAndSaveHost(host);
+  if (!granted) {
+    setCexStatus('error', 'Host permission was not granted.');
     return;
   }
 

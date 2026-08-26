@@ -1,4 +1,5 @@
 const PLUGIN_CLIENT_ID = 'content-studio-plugin';
+const DEFAULT_API_HOST = 'https://develop.content-studio.im';
 
 function base64UrlEncode(bytes) {
   let binary = '';
@@ -20,6 +21,16 @@ async function generatePkce() {
     challenge: base64UrlEncode(new Uint8Array(digest)),
     state: randomUrlToken(16),
   };
+}
+
+async function ensureApiHost() {
+  const { apiHost } = await chrome.storage.local.get('apiHost');
+  if (typeof apiHost === 'string' && apiHost.trim() !== '') {
+    return apiHost;
+  }
+
+  await chrome.storage.local.set({ apiHost: DEFAULT_API_HOST });
+  return DEFAULT_API_HOST;
 }
 
 function normalizeApiHost(value) {

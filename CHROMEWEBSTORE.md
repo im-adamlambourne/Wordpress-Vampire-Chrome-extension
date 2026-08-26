@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Content Studio
 
-> Last Updated: 2026-08-19
+> Last Updated: 2026-08-26
 
 Private Immediate Media listing. Not searchable on the public Chrome Web Store.
 Copy the fields below into the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
@@ -53,7 +53,7 @@ FEATURES
 • Draft checklist flags missing or over-long title, excerpt, SEO, Open Graph, keyphrase, and a thin body. Click a gap to send a targeted prompt.
 • Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
 • If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
-• Sign in from the chat overlay or the toolbar popup. Set your Content Studio server in Settings → Show advanced settings. A notification confirms a successful login.
+• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; change it in Settings → Show advanced settings. A notification confirms a successful login.
 • The signed-in toolbar popup shows the Workspace feature buttons enabled for your assigned site (the same glyphs as the Content Studio Workspace dashboard). Click a button to open that feature in a new tab.
 • Chat replies arrive in the overlay after you send a message; you do not wait on a frozen page while the assistant works.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
@@ -61,13 +61,13 @@ FEATURES
 HOW TO USE
 1. Install this listing while signed into Chrome with your Immediate Media Google account (or an account on the allowed tester list / Google Group).
 2. Pin Content Studio and open the toolbar popup.
-3. Open Settings, choose **Show advanced settings**, enter your Content Studio server, save, and allow access when Chrome asks.
-4. Click Log in, sign in to Content Studio, and Connect.
-5. Open a post or page in WordPress admin. The Revision Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay (after the server is saved) or Log in in the popup.
+3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, save the server, and allow access.
+4. Sign in to Content Studio, and Connect.
+5. Open a post or page in WordPress admin. The Revision Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
 6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
 
 PRIVACY
-The extension stores your server address, sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to the Content Studio server you configure, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
+The extension stores your server address (https://develop.content-studio.im unless you change it), sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to that Content Studio server, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
 
 PERMISSIONS
 • “Read your browsing history” (tabs) — detect whether the current tab is WordPress admin so the toolbar icon can show connected or disconnected, and send the current address to Content Studio so the popup can show Workspace features for the matching site. The extension does not record a history of sites you visit.
@@ -76,7 +76,7 @@ PERMISSIONS
 • “Storage” — remember server, token, display name, user id, and realtime connection settings.
 • “Notifications” — confirm login after the sign-in window closes.
 • “Offscreen documents” — keep a quiet background page open so chat replies can arrive after you send a message.
-• Optional access to the server you enter — requested when you save a host, not at install, so login, chat, and the realtime connection can reach that origin and the matching realtime host (local port 8081, or `ws.` plus the hostname you saved).
+• Optional access to the server you use — requested when you log in or save a host, not at install, so login, chat, and the realtime connection can reach that origin and the matching realtime host (default https://develop.content-studio.im, local port 8081, or `ws.` plus the hostname you saved).
 
 This extension is for Immediate Media staff. It is not affiliated with Automattic or WordPress.com.
 
@@ -128,8 +128,8 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 | `identity` | permissions | Open the Content Studio sign-in window and return the authorization redirect to the extension so staff can connect their account. This is not Google account sign-in. |
 | `notifications` | permissions | Show a “Successfully logged in” notification after the sign-in window closes, because the toolbar popup is already gone. Clicking the notification reopens the popup. |
 | `offscreen` | permissions | Keep a background page open with a realtime connection to Content Studio so assistant replies can arrive after the toolbar service has gone idle. The page has no UI and does not read WordPress. |
-| `*://*/wp-admin/*` | host_permissions | Run on self-hosted WordPress admin so the overlay can read the open draft and apply the user’s requested edits. Hosts vary by brand site, so the match is any `/wp-admin/` path rather than a single domain. The extension does not save or publish. |
-| `http://*/*` and `https://*/*` | optional_host_permissions | Not granted at install. When the user clicks Save host, Chrome prompts for the Content Studio origin and a matching realtime origin guessed from that saved hostname (`http://localhost:8081/*` on loopback, otherwise `https://ws.{hostname}/*`). After login, Echo connects to the `broadcasting.host` returned by Content Studio (the same host Laravel derives from that API request). The grant is so login, profile, Workspace catalog, logout, chat kick-off, channel authorization, and replies can reach those hosts. The extension does not use this grant to read arbitrary websites. |
+| `*://*/wp-admin/*` | content_scripts.matches | Run on self-hosted WordPress admin so the overlay can read the open draft and apply the user’s requested edits. Hosts vary by brand site, so the match is any `/wp-admin/` path rather than a single domain. This is not listed under `host_permissions` because Chrome ignores the path on that key and would treat it as all http(s) sites. The extension does not save or publish. |
+| `http://*/*` and `https://*/*` | optional_host_permissions | Not granted at install. When the user clicks Log in or Save host, Chrome prompts for the Content Studio origin and a matching realtime origin guessed from that hostname (`https://develop.content-studio.im` by default; `http://localhost:8081/*` on loopback, otherwise `https://ws.{hostname}/*`). After login, Echo connects to the `broadcasting.host` returned by Content Studio (the same host Laravel derives from that API request). The grant is so login, profile, Workspace catalog, logout, chat kick-off, channel authorization, and replies can reach those hosts. The extension does not use this grant to read arbitrary websites. |
 
 ## Privacy & Data Use
 
@@ -216,11 +216,10 @@ How to install
 Load the uploaded package. Pin the toolbar icon.
 
 How to configure
-1. Open the popup → Settings (cog) → Show advanced settings.
-2. Server: [STAGING CONTENT STUDIO ORIGIN]
-3. Save host and allow the origin (and a second realtime origin if Chrome asks: local port 8081, or `ws.` plus the hostname you entered) when Chrome prompts.
-4. Close Settings → Log in → sign in → Connect.
-5. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
+1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings to change it).
+2. Click Log in and allow the origin (and a second realtime origin if Chrome asks: `ws.` plus the hostname, or local port 8081) when Chrome prompts.
+3. Sign in → Connect.
+4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
 
 WordPress
 Open [STAGING WP ADMIN] → Posts → Edit a draft (Gutenberg or Classic). The Revision Assistant should appear bottom-right.
@@ -237,13 +236,14 @@ Try
 • Click the user icon in the popup header to log out; overlay hides the chat and shows Sign in.
 
 If you have no WordPress or Content Studio access
-The popup still opens. Without a host, login explains that a server must be saved. Content scripts only match URLs whose path contains /wp-admin/.
+The popup still opens. Log in prompts for access to https://develop.content-studio.im (or another host saved in Settings). Content scripts only match URLs whose path contains /wp-admin/.
 ```
 
 ## Version History
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Unreleased | 2026-08-26 | Classic Editor **Add Footers** control stays in the media-button row but is hidden; prompt wiring is unchanged. Default Content Studio host is `https://develop.content-studio.im`. WordPress admin attach is `content_scripts.matches` only (no required `host_permissions`), so optional `http://*/*` is not omitted as redundant. | Draft |
 | 0.7.0 | 2026-08-20 | Signed-in toolbar popup shows Workspace feature buttons for the user’s assigned site (`GET /api/plugin/workspace`), using the same glyphs as the Workspace dashboard. Clicking a button opens `/workspace/{siteId}?feature={key}`. | Draft |
 | 0.6.0 | 2026-08-19 | Chat replies arrive over a realtime connection. Echo uses `broadcasting.host` from login (`POST /api/plugin/token`); Save host also requests a matching realtime origin (`localhost:8081` or `ws.{saved hostname}`). | Draft |
 | 0.5.0 | 2026-08-14 | First private Chrome Web Store submission. Revision Assistant overlay, Content Studio login from the overlay or popup, draft edits including ACF standfirst/SEO fields. | Draft |
@@ -254,8 +254,8 @@ The popup still opens. Without a host, login explains that a server must be save
 
 - Reviewers cannot fully test chat apply without a WordPress admin and a Content Studio host. Supply staging credentials if possible.
 - After the store assigns an item ID, Content Studio must allow `https://<ITEM_ID>.chromiumapp.org/` or login from the store build fails while unpacked-dev login still works.
-- `optional_host_permissions` are `http://*/*` and `https://*/*` so staff can point at local or production hosts. Install does not grant them; Save host requests the API origin and a guessed realtime origin (`localhost:8081` or `ws.{saved hostname}`) that must match `broadcasting.host` from login. Reviewers sometimes query broad optional hosts — use the justification table above.
-- Content scripts match all `/wp-admin/` hosts because brand WordPress sites are not a single domain. Chat still requires a saved host and a valid token before anything is sent.
+- `optional_host_permissions` are `http://*/*` and `https://*/*` so staff can point at local or production hosts. Install does not grant them; Log in or Save host requests the API origin and a guessed realtime origin (`localhost:8081` or `ws.{hostname}`) that must match `broadcasting.host` from login. New installs default the API origin to `https://develop.content-studio.im`. Reviewers sometimes query broad optional hosts — use the justification table above.
+- Content scripts match all `/wp-admin/` hosts because brand WordPress sites are not a single domain. That pattern is not also in `host_permissions` (Chrome ignores the path on that key). Chat still requires a granted host and a valid token before anything is sent.
 - The overlay does not appear on WordPress.com Calypso.
 - Store icon is the Immediate Media IM circle on a black square (`icons/icon-128.png`).
 
@@ -264,7 +264,7 @@ The popup still opens. Without a host, login explains that a server must be save
 1. Copy Item ID from the dashboard.
 2. Confirm `chrome.identity.getRedirectURL()` for the store build is `https://<ITEM_ID>.chromiumapp.org/`.
 3. Add that URI to the Content Studio plugin OAuth client (`content-studio-plugin`), alongside the unpacked-dev URI.
-4. Install from the listing on a clean Chrome profile, save the production host, and log in once before inviting the rest of the team.
+4. Install from the listing on a clean Chrome profile, log in (default host `https://develop.content-studio.im`, or save another host in Settings), and confirm once before inviting the rest of the team.
 
 ### Rejection History
 

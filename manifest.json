@@ -4,7 +4,6 @@
   "version": "0.7.0",
   "description": "Revise WordPress drafts from a chat overlay, and open your Content Studio Workspace features from the toolbar.",
   "permissions": ["tabs", "storage", "identity", "notifications", "offscreen"],
-  "host_permissions": ["*://*/wp-admin/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
     "16": "icons/icon-16.png",
@@ -15,9 +14,10 @@
     "default_popup": "popup/popup.html",
     "default_title": "Content Studio",
     "default_icon": {
-      "16": "icons/icon-16.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
+      "16": "icons/icon-16-disconnected.png",
+      "32": "icons/icon-32-disconnected.png",
+      "48": "icons/icon-48-disconnected.png",
+      "128": "icons/icon-128-disconnected.png"
     }
   },
   "background": {

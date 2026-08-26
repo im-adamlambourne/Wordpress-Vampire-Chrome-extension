@@ -68,6 +68,10 @@ const SEO_PACK_PROMPT = 'Write the excerpt, SEO title, SEO description, Open Gra
 const HEADLINES_PROMPT = 'Suggest 5 alternative headlines for this draft. Do not change the draft yet.';
 const RELATED_IMAGES_PROMPT = 'Find related images from our archive to add to the article';
 const SEO_BACKLINKS_PROMPT = 'Find SEO-friendly backlinks to related articles in our archive';
+const ADD_FOOTERS_PROMPT = 'Add article footers to this draft according to the house style. Place them immediately before References if that heading is present; otherwise append them at the end. Do not rewrite the rest of the body.';
+const FOOTERS_HOST_ID = 'wpv-add-footers';
+/** Classic Add Footers stays in the media-button row; set true to show it. */
+const ADD_FOOTERS_BUTTON_VISIBLE = false;
 const GREETING_ITEMS = [
   { icon: 'photo', label: RELATED_IMAGES_PROMPT, prompt: RELATED_IMAGES_PROMPT },
   { icon: 'link', label: SEO_BACKLINKS_PROMPT, prompt: SEO_BACKLINKS_PROMPT },
@@ -858,6 +862,186 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 `;
 
+const FOOTERS_BUTTON_CSS = `:host {
+  display: inline-block;
+  vertical-align: top;
+  margin-block: 0 4px;
+  margin-inline: 0 5px;
+  font-family: inherit;
+  color-scheme: light;
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 30px;
+  padding-block: 0;
+  padding-inline: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #3ab5f4 0%, #0b61b6 100%);
+  color: #fff;
+  font: 600 13px / 1.2 inherit;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+button:focus-visible {
+  outline: 2px solid #7ee2fc;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+img {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.label {
+  text-box: trim-both cap alphabetic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  button {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonText;
+    filter: none;
+  }
+}
+`;
+
+let footersOnClick = null;
+let footersBusy = false;
+let footersToolbarQueued = false;
+let footersToolbarObserver = null;
+
+function footersToolbarRow() {
+  return document.getElementById('wp-content-media-buttons')
+    || document.querySelector('#wp-content-editor-tools .wp-media-buttons')
+    || document.querySelector('.wp-media-buttons:has(#insert-media-button)');
+}
+
+function setFootersToolbar({ busy = false, onClick } = {}) {
+  if (typeof onClick === 'function') footersOnClick = onClick;
+  footersBusy = Boolean(busy);
+  ensureFootersToolbar();
+}
+
+function ensureFootersToolbar() {
+  if (footersToolbarQueued) return;
+  footersToolbarQueued = true;
+  requestAnimationFrame(() => {
+    footersToolbarQueued = false;
+    injectFootersToolbar();
+  });
+}
+
+function injectFootersToolbar() {
+  if (typeof footersOnClick !== 'function') return;
+
+  const row = footersToolbarRow();
+  if (!row) return;
+
+  let host = document.getElementById(FOOTERS_HOST_ID);
+  if (host && host.parentElement !== row) {
+    host.remove();
+    host = null;
+  }
+  if (!host) {
+    host = buildFootersToolbarHost();
+    row.appendChild(host);
+  }
+
+  host.hidden = !ADD_FOOTERS_BUTTON_VISIBLE;
+  const button = host.shadowRoot?.querySelector('button');
+  if (button) button.disabled = footersBusy;
+}
+
+function buildFootersToolbarHost() {
+  const host = document.createElement('span');
+  host.id = FOOTERS_HOST_ID;
+  host.className = 'wpv-add-footers';
+  host.hidden = !ADD_FOOTERS_BUTTON_VISIBLE;
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = FOOTERS_BUTTON_CSS;
+  const button = document.createElement('button');
+  button.type = 'button';
+  const logo = document.createElement('img');
+  logo.src = chrome.runtime.getURL('icons/icon-48.png');
+  logo.alt = '';
+  logo.width = 18;
+  logo.height = 18;
+  logo.setAttribute('aria-hidden', 'true');
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = 'Add Footers';
+  button.append(logo, label);
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    footersOnClick?.();
+  });
+  shadow.append(style, button);
+  return host;
+}
+
+function watchFootersToolbar() {
+  if (footersToolbarObserver || !document.body) return;
+
+  footersToolbarObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type !== 'childList') continue;
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (
+          node.id === 'wp-content-media-buttons'
+          || node.id === 'wp-content-editor-tools'
+          || node.classList.contains('wp-media-buttons')
+          || node.querySelector?.('#wp-content-media-buttons, .wp-media-buttons')
+        ) {
+          ensureFootersToolbar();
+          return;
+        }
+      }
+      for (const node of mutation.removedNodes) {
+        if (node instanceof Element && (node.id === FOOTERS_HOST_ID || node.querySelector?.(`#${FOOTERS_HOST_ID}`))) {
+          ensureFootersToolbar();
+          return;
+        }
+      }
+    }
+  });
+
+  footersToolbarObserver.observe(document.body, { childList: true, subtree: true });
+  ensureFootersToolbar();
+}
+
 function isEditorPath() {
   const file = location.pathname.split('/').pop() || '';
   return file === 'post.php' || file === 'post-new.php';
@@ -1593,7 +1777,13 @@ function bindComposer(root, initialAuth = {}) {
     ...initialAuth,
   };
 
-  const refreshComposer = () => setComposerEnabled(root, state);
+  const refreshComposer = () => {
+    setComposerEnabled(root, state);
+    setFootersToolbar({
+      busy: state.busy || state.signingIn,
+      onClick: handleFootersClick,
+    });
+  };
   refreshComposer();
 
   async function startSignIn() {
@@ -1617,6 +1807,15 @@ function bindComposer(root, initialAuth = {}) {
     }
     refreshComposer();
     if (state.signedIn) input.focus();
+  }
+
+  async function handleFootersClick() {
+    setOpen(root, true, { focus: false });
+    if (!state.signedIn) {
+      await startSignIn();
+      return;
+    }
+    await sendUserMessage(ADD_FOOTERS_PROMPT);
   }
 
   async function refreshEditorChrome() {
@@ -1930,6 +2129,8 @@ async function mount() {
       setOpen(root, true, { focus: false });
     });
   });
+
+  watchFootersToolbar();
 }
 
 function watchForEditor() {

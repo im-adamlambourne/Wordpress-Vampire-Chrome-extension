@@ -1,66 +1,45 @@
 importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
 
-const LIGHT_CONNECTED = '#22c55e';
-const LIGHT_DISCONNECTED = '#ef4444';
-const ICON_SIZES = [16, 32];
-
-const composedIcons = {
-  connected: null,
-  disconnected: null,
-};
-
-function sourceIconPath(size) {
-  return size <= 16 ? 'icons/icon-16.png' : 'icons/icon-48.png';
+function statusIconPath(connected) {
+  const suffix = connected ? 'connected' : 'disconnected';
+  return {
+    16: `/icons/icon-16-${suffix}.png`,
+    32: `/icons/icon-32-${suffix}.png`,
+    48: `/icons/icon-48-${suffix}.png`,
+    128: `/icons/icon-128-${suffix}.png`,
+  };
 }
 
-function drawStatusLight(ctx, size, color) {
-  const radius = Math.max(2.5, size * 0.16);
-  const inset = Math.max(1, size * 0.08);
-  const x = size - inset - radius;
-  const y = size - inset - radius;
-
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.lineWidth = Math.max(1, size * 0.06);
-  ctx.strokeStyle = '#ffffff';
-  ctx.stroke();
+function isHttpUrl(url) {
+  return typeof url === 'string' && /^https?:\/\//i.test(url);
 }
 
-async function loadSourceBitmap(size) {
-  const response = await fetch(chrome.runtime.getURL(sourceIconPath(size)));
-  if (!response.ok) throw new Error(`Failed to load icon (${response.status})`);
-  const blob = await response.blob();
-  return createImageBitmap(blob);
+function isWpAdminUrl(url) {
+  if (!isHttpUrl(url)) return false;
+  const path = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').split(/[?#]/, 1)[0];
+  return path.includes('/wp-admin/');
 }
 
-async function composeStatusIcons(connected) {
-  const cacheKey = connected ? 'connected' : 'disconnected';
-  if (composedIcons[cacheKey]) return composedIcons[cacheKey];
+function isBenignActionError(err) {
+  const message = String(err?.message ?? err);
+  return /no tab with id|cannot be edited right now|tab was closed|invalid tab/i.test(message);
+}
 
-  const color = connected ? LIGHT_CONNECTED : LIGHT_DISCONNECTED;
-  const imageData = {};
-
-  for (const size of ICON_SIZES) {
-    const bitmap = await loadSourceBitmap(size);
-    const canvas = new OffscreenCanvas(size, size);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, size, size);
-    drawStatusLight(ctx, size, color);
-    imageData[size] = ctx.getImageData(0, 0, size, size);
-  }
-
-  composedIcons[cacheKey] = imageData;
-  return imageData;
+async function tabActionTarget(tabId) {
+  if (tabId == null) return {};
+  const tab = await chrome.tabs.get(tabId);
+  if (!isHttpUrl(tab.url)) return null;
+  return { tabId };
 }
 
 async function applyStatus(connected, tabId) {
-  const target = tabId != null ? { tabId } : {};
   try {
+    const target = await tabActionTarget(tabId);
+    if (!target) return;
+
     await chrome.action.setBadgeText({ text: '', ...target });
     await chrome.action.setIcon({
-      imageData: await composeStatusIcons(connected),
+      path: statusIconPath(connected),
       ...target,
     });
     await chrome.action.setTitle({
@@ -68,16 +47,8 @@ async function applyStatus(connected, tabId) {
       ...target,
     });
   } catch (err) {
+    if (isBenignActionError(err)) return;
     console.error('Failed to update action status:', err);
-  }
-}
-
-function isWpAdminUrl(url) {
-  if (!url) return false;
-  try {
-    return new URL(url).pathname.includes('/wp-admin/');
-  } catch {
-    return false;
   }
 }
 
@@ -108,8 +79,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (!changeInfo.url && changeInfo.status !== 'complete') return;
-  if (isWpAdminUrl(tab.url)) return;
+  if (!changeInfo.url) return;
+  if (isWpAdminUrl(changeInfo.url) || isWpAdminUrl(tab.url)) return;
+  if (!isHttpUrl(tab.url)) return;
   await applyStatus(false, tabId);
 });
 
@@ -128,9 +100,11 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+  ensureApiHost();
   restorePluginEcho();
 });
 
+ensureApiHost();
 restorePluginEcho();
 
 chrome.storage.onChanged.addListener((changes, area) => {

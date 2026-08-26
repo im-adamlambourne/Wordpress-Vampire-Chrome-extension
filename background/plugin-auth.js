@@ -186,10 +186,13 @@ async function resolvePluginLogin(message) {
     });
   }
 
-  const { apiHost } = await chrome.storage.local.get('apiHost');
-  if (!apiHost) {
+  const apiHost = await ensureApiHost();
+  const granted = await chrome.permissions.contains({
+    origins: pluginOptionalOrigins(apiHost),
+  });
+  if (!granted) {
     await openPluginPopup();
-    throw new Error('Save a server host in the toolbar popup, then sign in.');
+    throw new Error('Log in from the toolbar popup to allow access to Content Studio.');
   }
 
   const pkce = await generatePkce();
@@ -203,7 +206,7 @@ async function resolvePluginLogin(message) {
 
 async function startPluginLogin({ host, verifier, challenge, state }) {
   if (!host || !verifier || !challenge || !state) {
-    throw new Error('Save a server host, then try logging in again.');
+    throw new Error('Choose a server host, then try logging in again.');
   }
 
   const redirectUri = chrome.identity.getRedirectURL();

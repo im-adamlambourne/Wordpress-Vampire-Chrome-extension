@@ -10,7 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Project changelog. Agent rules in `AGENTS.md` and `CLAUDE.md` require every change to be recorded here.
+- Classic Editor **Add Footers** button next to Add Media, branded with the Immediate Media IM logo and cyan-to-royal gradient. A click opens the revision overlay and asks the assistant to append house-style footers.
+
+### Changed
+
+- Classic Editor **Add Footers** is hidden in the media-button row (`hidden`); the control and prompt wiring stay in place.
+- Default Content Studio host is `https://develop.content-studio.im`. Log in requests access for that origin (or another host saved in Settings). Existing saved hosts are left unchanged.
+
+### Fixed
+
+- Chrome no longer omits optional `http://*/*` as redundant. Required `host_permissions` `*://*/wp-admin/*` is gone: Chrome ignores the path on host permissions, so that pattern was treated as all http(s) sites. WordPress admin attach stays on `content_scripts.matches`.
+- Toolbar status light uses pre-rendered IM icons instead of OffscreenCanvas `ImageData`, so `chrome.action.setIcon` no longer fails in the service worker. Closed, dragging, and non-http(s) tabs are skipped instead of logged as extension errors.
 
 ## [0.7.0] - 2026-08-20
 
