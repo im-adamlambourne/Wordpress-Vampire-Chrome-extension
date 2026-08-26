@@ -1,10 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Content Studio",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Revise WordPress drafts from a chat overlay, and open your Content Studio Workspace features from the toolbar.",
   "permissions": ["tabs", "storage", "identity", "notifications", "offscreen"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "optional_host_permissions": [
+    "https://content-studio.im/*",
+    "https://develop.content-studio.im/*",
+    "https://ws.content-studio.im/*",
+    "https://ws.develop.content-studio.im/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*",
+    "http://localhost:8081/*",
+    "http://127.0.0.1:8081/*"
+  ],
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -25,12 +36,22 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*/wp-admin/*"],
+      "matches": [
+        "https://*.production.wcp.imdserve.com/wp-admin/*",
+        "https://*.release.wcp.imdserve.com/wp-admin/*",
+        "http://localhost/wp-admin/*",
+        "http://127.0.0.1/wp-admin/*"
+      ],
       "js": ["content/detect.js", "content/chat-modal.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*/wp-admin/*"],
+      "matches": [
+        "https://*.production.wcp.imdserve.com/wp-admin/*",
+        "https://*.release.wcp.imdserve.com/wp-admin/*",
+        "http://localhost/wp-admin/*",
+        "http://127.0.0.1/wp-admin/*"
+      ],
       "js": ["content/editor-bridge.js"],
       "run_at": "document_idle",
       "world": "MAIN"
@@ -39,7 +60,12 @@
   "web_accessible_resources": [
     {
       "resources": ["assets/robot.png", "assets/chat-notification.mp3", "icons/icon-48.png"],
-      "matches": ["http://*/*", "https://*/*"]
+      "matches": [
+        "https://*.production.wcp.imdserve.com/*",
+        "https://*.release.wcp.imdserve.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ]
     }
   ]
 }

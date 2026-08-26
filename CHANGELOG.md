@@ -8,18 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-26
+
 ### Added
 
 - Classic Editor **Add Footers** button next to Add Media, branded with the Immediate Media IM logo and cyan-to-royal gradient. A click opens the revision overlay and asks the assistant to append house-style footers.
+- Chrome Web Store privacy policy page (hosted at Content Studio `GET /plugin/privacy`; copy in `docs/privacy-policy.html`).
 
 ### Changed
 
+- WordPress admin attach is Immediate Media WCP (`https://*.production.wcp.imdserve.com/wp-admin/*`, `https://*.release.wcp.imdserve.com/wp-admin/*`) and local loopback, not every `/wp-admin/` site. Overlay assets are only exposed on those hosts.
+- Optional host access is the Content Studio origins and matching realtime hosts (`https://content-studio.im`, `https://develop.content-studio.im`, `https://ws.` of those hosts, and localhost / port 8081), requested on **Log in** or **Save host**. `http://*/*` and `https://*/*` are gone so Chrome Web Store no longer flags Broad Host Permissions. `activeTab` is not used: the overlay must inject on the editor without an action-icon click.
 - Classic Editor **Add Footers** is hidden in the media-button row (`hidden`); the control and prompt wiring stay in place.
-- Default Content Studio host is `https://develop.content-studio.im`. Log in requests access for that origin (or another host saved in Settings). Existing saved hosts are left unchanged.
+- Default Content Studio host is `https://develop.content-studio.im`. Log in requests access for that origin (or another allowed host saved in Settings). Existing saved hosts are left unchanged.
+- Privacy policy names Immediate Media Company Limited as controller, states Chrome Web Store Limited Use, lists OpenRouter and Google Gemini as processors, and gives `dataprotection@immediate.co.uk` as the contact. Live URLs are `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy`.
 
 ### Fixed
 
-- Chrome no longer omits optional `http://*/*` as redundant. Required `host_permissions` `*://*/wp-admin/*` is gone: Chrome ignores the path on host permissions, so that pattern was treated as all http(s) sites. WordPress admin attach stays on `content_scripts.matches`.
 - Toolbar status light uses pre-rendered IM icons instead of OffscreenCanvas `ImageData`, so `chrome.action.setIcon` no longer fails in the service worker. Closed, dragging, and non-http(s) tabs are skipped instead of logged as extension errors.
 
 ## [0.7.0] - 2026-08-20

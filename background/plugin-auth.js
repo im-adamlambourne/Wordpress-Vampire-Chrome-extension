@@ -187,6 +187,7 @@ async function resolvePluginLogin(message) {
   }
 
   const apiHost = await ensureApiHost();
+  assertAllowedApiHost(apiHost);
   const granted = await chrome.permissions.contains({
     origins: pluginOptionalOrigins(apiHost),
   });

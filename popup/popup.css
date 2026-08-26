@@ -288,6 +288,13 @@ main {
   color: var(--color-muted);
 }
 
+.hint {
+  display: block;
+  color: var(--color-muted);
+  font-size: 12px;
+  margin-bottom: 0.25rem;
+}
+
 #cex-host {
   width: 100%;
   min-height: 36px;

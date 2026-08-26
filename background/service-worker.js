@@ -14,12 +14,6 @@ function isHttpUrl(url) {
   return typeof url === 'string' && /^https?:\/\//i.test(url);
 }
 
-function isWpAdminUrl(url) {
-  if (!isHttpUrl(url)) return false;
-  const path = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').split(/[?#]/, 1)[0];
-  return path.includes('/wp-admin/');
-}
-
 function isBenignActionError(err) {
   const message = String(err?.message ?? err);
   return /no tab with id|cannot be edited right now|tab was closed|invalid tab/i.test(message);

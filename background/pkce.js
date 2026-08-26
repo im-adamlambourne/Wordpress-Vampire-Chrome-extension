@@ -1,6 +1,30 @@
 const PLUGIN_CLIENT_ID = 'content-studio-plugin';
 const DEFAULT_API_HOST = 'https://develop.content-studio.im';
 
+const ALLOWED_API_ORIGINS = [
+  'https://content-studio.im',
+  'https://develop.content-studio.im',
+  'http://localhost',
+  'http://127.0.0.1',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+];
+
+const WP_ADMIN_HOST_SUFFIXES = [
+  '.production.wcp.imdserve.com',
+  '.release.wcp.imdserve.com',
+];
+
+const WP_ADMIN_TAB_URLS = [
+  'https://*.production.wcp.imdserve.com/wp-admin/*',
+  'https://*.release.wcp.imdserve.com/wp-admin/*',
+  'http://localhost/wp-admin/*',
+  'http://127.0.0.1/wp-admin/*',
+];
+
+const ALLOWED_API_HOST_MESSAGE =
+  'Use https://content-studio.im, https://develop.content-studio.im, or http://localhost.';
+
 function base64UrlEncode(bytes) {
   let binary = '';
   for (const byte of bytes) {
@@ -49,6 +73,33 @@ function normalizeApiHost(value) {
   }
 
   return url.origin;
+}
+
+function assertAllowedApiHost(host) {
+  if (ALLOWED_API_ORIGINS.includes(host)) return host;
+  throw new Error(ALLOWED_API_HOST_MESSAGE);
+}
+
+function isLoopbackHostname(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function isWpAdminHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  if (isLoopbackHostname(host)) return true;
+  return WP_ADMIN_HOST_SUFFIXES.some(
+    (suffix) => host.endsWith(suffix) && host.length > suffix.length,
+  );
+}
+
+function isWpAdminUrl(url) {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname.includes('/wp-admin/') && isWpAdminHost(parsed.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function hostOriginPattern(host) {

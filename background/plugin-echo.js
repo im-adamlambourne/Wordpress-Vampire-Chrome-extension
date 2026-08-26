@@ -148,7 +148,7 @@ async function deliverPluginChatResult(tabId, message, requestId) {
 
   const tabIds = new Set([tabId]);
   try {
-    const adminTabs = await chrome.tabs.query({ url: '*://*/wp-admin/*' });
+    const adminTabs = await chrome.tabs.query({ url: WP_ADMIN_TAB_URLS });
     for (const tab of adminTabs) {
       if (tab.id != null) tabIds.add(tab.id);
     }

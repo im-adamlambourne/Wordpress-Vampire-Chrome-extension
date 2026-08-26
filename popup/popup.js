@@ -76,9 +76,21 @@ function enableLightDismiss(dialog) {
   });
 }
 
+function syncHostValidity(input) {
+  try {
+    if (input.value.trim()) {
+      assertAllowedApiHost(normalizeApiHost(input.value));
+    }
+    input.setCustomValidity('');
+  } catch (err) {
+    input.setCustomValidity(err.message);
+  }
+}
+
 function syncHostAria(event) {
   const input = event.target;
   if (input !== hostInput || !input.matches) return;
+  syncHostValidity(input);
   if (input.matches(':user-invalid')) {
     input.setAttribute('aria-invalid', 'true');
   } else {
@@ -95,7 +107,13 @@ hostInput.addEventListener('input', (event) => {
 });
 
 async function grantAndSaveHost(host) {
-  const granted = await chrome.permissions.request({ origins: pluginOptionalOrigins(host) });
+  assertAllowedApiHost(host);
+  let granted;
+  try {
+    granted = await chrome.permissions.request({ origins: pluginOptionalOrigins(host) });
+  } catch (err) {
+    throw new Error(err.message || 'Could not request access to that server.');
+  }
   if (!granted) {
     return { granted: false };
   }
@@ -169,7 +187,7 @@ hostForm.addEventListener('submit', async (event) => {
 
   let host;
   try {
-    host = normalizeApiHost(hostInput.value);
+    host = assertAllowedApiHost(normalizeApiHost(hostInput.value));
     hostInput.setCustomValidity('');
   } catch (err) {
     hostInput.setCustomValidity(err.message);
@@ -177,7 +195,14 @@ hostForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const { granted, previousHost } = await grantAndSaveHost(host);
+  let granted;
+  let previousHost;
+  try {
+    ({ granted, previousHost } = await grantAndSaveHost(host));
+  } catch (err) {
+    setCexStatus('error', err.message || 'Could not request access to that server.');
+    return;
+  }
   if (!granted) {
     setCexStatus('error', 'Host permission was not granted.');
     return;
@@ -192,13 +217,19 @@ hostForm.addEventListener('submit', async (event) => {
 loginBtn.addEventListener('click', async () => {
   let host;
   try {
-    host = normalizeApiHost(hostInput.value || DEFAULT_API_HOST);
+    host = assertAllowedApiHost(normalizeApiHost(hostInput.value || DEFAULT_API_HOST));
   } catch (err) {
     setCexStatus('error', err.message);
     return;
   }
 
-  const { granted } = await grantAndSaveHost(host);
+  let granted;
+  try {
+    ({ granted } = await grantAndSaveHost(host));
+  } catch (err) {
+    setCexStatus('error', err.message || 'Could not request access to that server.');
+    return;
+  }
   if (!granted) {
     setCexStatus('error', 'Host permission was not granted.');
     return;
@@ -473,15 +504,6 @@ workspaceSiteForm.addEventListener('submit', (event) => {
 workspaceSiteSelect.addEventListener('change', () => {
   applySelectedWorkspaceSite();
 });
-
-function isWpAdminUrl(url) {
-  if (!url) return false;
-  try {
-    return new URL(url).pathname.includes('/wp-admin/');
-  } catch {
-    return false;
-  }
-}
 
 function setStatus(state, message) {
   statusEl.dataset.state = state;

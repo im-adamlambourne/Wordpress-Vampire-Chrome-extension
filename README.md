@@ -1,7 +1,6 @@
 # Content Studio
 
-Chrome extension (Manifest V3) that attaches to self-hosted WordPress admin
-(`/wp-admin/`) and signs in so later API calls can run as the signed-in user.
+Chrome extension (Manifest V3) that attaches to Immediate Media WordPress Cloud Platform admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com` `/wp-admin/`) and signs in so later API calls can run as the signed-in user.
 
 Immediate Media branded. Targets Gutenberg and Classic. Not WordPress.com Calypso.
 
@@ -13,19 +12,19 @@ Release history is in [`CHANGELOG.md`](CHANGELOG.md).
 ## Load unpacked
 
 1. `chrome://extensions` → Developer mode → Load unpacked → this repo root.
-2. Reload the extension after code changes. Reload the WordPress tab so content scripts reinject.
+2. Reload the extension after code changes. Reload the WordPress tab so content scripts reinject. The overlay only injects on Immediate Media WCP admin (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`) and `http://localhost` / `http://127.0.0.1`.
 
 ## Login
 
 The popup (toolbar icon) is the sign-in screen and Workspace launcher. After you sign in it shows your name in the header next to a user icon and Settings, plus the Workspace feature buttons enabled for your assigned site (the same set as the Workspace dashboard). Open **Settings** (cog) to switch Workspace site when you have more than one. **Show advanced settings** holds the Laravel **Server** and the WordPress session dump. Click the user icon to log out.
 
-1. Open the popup and click **Log in**. New installs use **Server** `https://develop.content-studio.im` (shown under **Settings** → **Show advanced settings**). Allow the API origin and the realtime origin when Chrome asks (`https://ws.develop.content-studio.im` for that default, `http://localhost:8081` for a local server, or `https://ws.{hostname}` for any other saved host). Echo itself does not use that guess — after login it uses `broadcasting.host` from `POST /api/plugin/token` (Laravel derives the same `localhost:8081` / `ws.{API host}` unless `PLUGIN_REVERB_*` overrides it).
+1. Open the popup and click **Log in**. New installs use **Server** `https://develop.content-studio.im` (shown under **Settings** → **Show advanced settings**). Allow the API origin and the realtime origin when Chrome asks (`https://ws.develop.content-studio.im` for that default, `https://ws.content-studio.im` for production, or `http://localhost:8081` for a local server). Echo itself does not use that guess — after login it uses `broadcasting.host` from `POST /api/plugin/token` (Laravel derives the same `localhost:8081` / `ws.{API host}` unless `PLUGIN_REVERB_*` overrides it).
 2. To point at a Sail app instead, open **Settings** → **Show advanced settings**, set **Server** to the Laravel origin (often `http://localhost` on port 80; some READMEs say `http://localhost:8080`), **Save host**, and allow access. Start Reverb locally with `docker compose exec laravel.test php artisan reverb:start` (host port **8081**) and a `generative` worker (`docker compose exec laravel.test php artisan horizon`, or `queue:work --queue=generative`). With `QUEUE_CONNECTION=sync`, chat POST waits on Flash instead of returning 202 immediately.
 3. After **Log in** (popup) or **Sign in** (editor overlay), Chrome opens the sign-in window. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**. Sessions saved before 0.6.0 must log in again. Overlay **Sign in** uses the saved host (or the develop default); if Chrome has not granted that origin yet, it opens the toolbar popup so **Log in** can request access.
 4. The popup closes during the bounce. A Chrome notification should confirm the login, and the plugin popup should reopen with **Successfully logged in as {name}**. Clicking the notification also opens the popup. The popup then loads your Workspace features (`GET /api/plugin/workspace`) — if you are assigned to Radio Times, unmatched tabs default to that site's enabled feature buttons with the same glyphs as the Workspace hub. Click a button to open `/workspace/{siteId}?feature={key}` in a new tab.
 5. If the WordPress editor is already open while signed out, the overlay hides the chat (greeting, checklist, composer) and shows **Sign in** instead. Click it to start the same identity bounce (the develop default host is used when none is saved). The chat returns as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with the IM circle next to **Revision Assistant**, rolling-dot thinking loader, send spinner, and a short reply sound. The greeting uses the signed-in first name and lists related images and SEO backlinks under **I can also**. A draft checklist flags missing excerpt, SEO, Open Graph, keyphrase, or a thin body. Glyph buttons above the composer are labeled Images, Backlinks, SEO, and Headlines. Send kicks off `POST /api/plugin/chat` (202) and the reply arrives over Reverb (Gemini 3.7 Flash). When the agent returns `edits`, the extension writes title, selected copy, body, excerpt, SEO title/description, Open Graph title/description, and focus keyphrase into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present; matching ACF standfirst/SEO text fields when the site uses Advanced Custom Fields for those boxes) and marks the draft unsaved so Save/Update and the leave-page warning work. Related images, SEO backlinks, and article footers are inserted into the body the same way. Paste an http(s) URL in chat to have OpenRouter fetch the page (the extension does not fetch it). Headline ideas appear as buttons on the bubble. It does not save or publish; use WordPress Undo to revert title/body. If the WordPress host matches one of the signed-in user's Content Exchange sites, that site's house style is injected into the chat and archive image/backlink search is scoped to that site. If the host does not match and the user has exactly one assigned site, that site's guide is used instead.
 
-The host is stored in `chrome.storage.local` so you can point at local, staging, or production without rebuilding. New installs default to `https://develop.content-studio.im`. Changing host clears the stored token, display name, user id, and realtime settings.
+The host is stored in `chrome.storage.local` so you can point at local, develop, or production Content Studio without rebuilding. Allowed servers are `https://content-studio.im`, `https://develop.content-studio.im`, and `http://localhost` (including port 8080). New installs default to `https://develop.content-studio.im`. Changing host clears the stored token, display name, user id, and realtime settings.
 
 WordPress session debug is in **Settings** → **Show advanced settings**, below the host field. It is not the plugin account name.
 
@@ -34,7 +33,7 @@ WordPress session debug is in **Settings** → **Show advanced settings**, below
 ```
 Save host or Log in
   → chrome.permissions.request for the API origin and a guessed Reverb origin
-    (localhost:8081, or https://ws.{saved hostname}/*)
+    (localhost:8081, or https://ws.content-studio.im / https://ws.develop.content-studio.im)
 Log in (popup or overlay Sign in)
   → service worker chrome.identity.launchWebAuthFlow
   → GET {host}/plugin/authorize (PKCE)
@@ -70,7 +69,7 @@ The WebSocket host is **only** `broadcasting` from the token response (stored in
 
 Staff install is a **Private** Chrome Web Store listing (not public search). Unlisted is the wrong setting: anyone with the URL could install it.
 
-Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.7.0.zip`). Host `docs/privacy-policy.html` at a public URL before you submit.
+Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.7.1.zip`). The privacy policy is `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy` (`GET /plugin/privacy` on Content Studio; copy in `docs/privacy-policy.html`). It must load without signing in.
 
 After the store assigns an item ID, add `https://<item-id>.chromiumapp.org/` to the Content Studio OAuth client. Unpacked-dev and store builds use different extension IDs.
 
@@ -81,9 +80,9 @@ After the store assigns an item ID, add `https://<item-id>.chromiumapp.org/` to 
 - `identity` — OAuth bounce
 - `notifications` — confirm login after the identity window closes (popup is already gone)
 - `offscreen` — keep a WebSocket open so chat replies can arrive after the service worker sleeps
-- `content_scripts.matches` `*://*/wp-admin/*` — WordPress admin attach (do not put this in `host_permissions`: Chrome ignores the path there, treats it as all http(s) sites, and omits optional `http://*/*`)
-- `optional_host_permissions` `http://*/*` and `https://*/*` — requested at runtime on **Log in** or **Save host** for the configured Laravel origin (default `https://develop.content-studio.im`) and the guessed Reverb origin (`localhost:8081` or `ws.{hostname}`), which must match `broadcasting` from the token (not `<all_urls>`)
-- `web_accessible_resources` — robot avatar, chat notification sound, and IM header logo (`http://*/*` and `https://*/*`; Chrome only allows a `/*` path here)
+- `content_scripts.matches` Immediate Media WCP admin (`https://*.production.wcp.imdserve.com/wp-admin/*`, `https://*.release.wcp.imdserve.com/wp-admin/*`) plus local loopback — WordPress admin attach. Do not put a `*://*/wp-admin/*` pattern in `host_permissions`: Chrome ignores the path there and treats it as all http(s) sites.
+- `optional_host_permissions` Content Studio and realtime origins (`https://content-studio.im/*`, `https://develop.content-studio.im/*`, `https://ws.content-studio.im/*`, `https://ws.develop.content-studio.im/*`, and localhost including ports 8080 and 8081) — requested at runtime on **Log in** or **Save host** for the configured Laravel origin and the guessed Reverb origin (`localhost:8081` or `ws.{hostname}`), which must match `broadcasting` from the token
+- `web_accessible_resources` — robot avatar, chat notification sound, and IM header logo on the same WCP and loopback hosts (Chrome only allows a `/*` path here)
 
 ## Out of scope until asked
 
