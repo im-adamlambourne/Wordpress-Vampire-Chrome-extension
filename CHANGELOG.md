@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Realtime connection failures show “Could not connect to Content Studio. Please try again later.” instead of asking the user to start Reverb.
+
 ## [0.7.1] - 2026-08-26
 
 ### Added

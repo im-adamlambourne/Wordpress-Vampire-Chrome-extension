@@ -85,7 +85,7 @@ async function sendPluginChat({ message, history, article }, tabId) {
   } catch (err) {
     return {
       ok: false,
-      error: err.message || 'Sign in again via the Content Studio toolbar popup to enable realtime chat.',
+      error: err.message || 'Could not connect to Content Studio. Please try again later.',
     };
   }
 

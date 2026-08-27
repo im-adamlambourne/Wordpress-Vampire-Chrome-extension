@@ -16,7 +16,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await connectEcho(message);
         sendResponse({ ok: true });
       } catch (err) {
-        sendResponse({ ok: false, error: err.message || 'Could not open the realtime connection.' });
+        sendResponse({ ok: false, error: err.message || 'Could not connect to Content Studio. Please try again later.' });
       }
     })();
     return true;
@@ -119,7 +119,7 @@ function waitForPusherConnection(pusher) {
 
     const timer = setTimeout(() => {
       cleanup();
-      reject(connectionError(pusher));
+      reject(connectionError());
     }, CONNECT_TIMEOUT_MS);
 
     const onConnected = () => {
@@ -128,7 +128,7 @@ function waitForPusherConnection(pusher) {
     };
     const onFailed = () => {
       cleanup();
-      reject(connectionError(pusher));
+      reject(connectionError());
     };
 
     function cleanup() {
@@ -144,14 +144,8 @@ function waitForPusherConnection(pusher) {
   });
 }
 
-function connectionError(pusher) {
-  const state = pusher?.connection?.state;
-  const hint = state && state !== 'connecting'
-    ? ` (${state})`
-    : '';
-  return new Error(
-    `Could not open the realtime connection${hint}. Start Reverb on the Content Studio server, then save the host again and allow the realtime origin.`,
-  );
+function connectionError() {
+  return new Error('Could not connect to Content Studio. Please try again later.');
 }
 
 function subscribeToPluginChannel(userId) {

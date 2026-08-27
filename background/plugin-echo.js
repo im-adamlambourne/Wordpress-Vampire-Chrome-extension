@@ -67,7 +67,7 @@ async function connectPluginEcho() {
   });
 
   if (result && result.ok === false) {
-    throw new Error(result.error || 'Could not open the realtime connection.');
+    throw new Error(result.error || 'Could not connect to Content Studio. Please try again later.');
   }
 }
 
