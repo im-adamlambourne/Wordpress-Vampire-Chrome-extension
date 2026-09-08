@@ -543,7 +543,17 @@ function normaliseEdits(raw) {
       edits[field.key] = raw[field.key].trim().slice(0, field.max);
     }
   }
+  for (const key of clearableKeys(raw.clear)) {
+    if (!(key in edits)) edits[key] = '';
+  }
   return edits;
+}
+
+/** Keys the overlay may blank on undo. Body and selection are never cleared. */
+function clearableKeys(raw) {
+  if (!Array.isArray(raw)) return [];
+  const allowed = ['title', 'excerpt', ...SEO_FIELDS.map((field) => field.key)];
+  return raw.filter((key) => typeof key === 'string' && allowed.includes(key));
 }
 
 function stripScripts(html) {
@@ -555,8 +565,8 @@ function applyGutenberg(edits) {
   const editorDispatch = window.wp.data.dispatch('core/editor');
   const meta = {};
 
-  if (edits.title) meta.title = edits.title;
-  if (edits.excerpt) meta.excerpt = edits.excerpt;
+  if ('title' in edits) meta.title = edits.title;
+  if ('excerpt' in edits) meta.excerpt = edits.excerpt;
 
   if (edits.selection) {
     applied.push(...applyGutenbergSelection(edits));
@@ -580,8 +590,8 @@ function applyGutenberg(edits) {
   if (Object.keys(meta).length > 0) {
     try {
       editorDispatch.editPost(meta);
-      if (meta.title) applied.push('title');
-      if (meta.excerpt) applied.push('excerpt');
+      if ('title' in meta) applied.push('title');
+      if ('excerpt' in meta) applied.push('excerpt');
     } catch (err) {
       if (applied.length === 0) throw err;
     }
@@ -652,14 +662,14 @@ function applyGutenbergSelection(edits) {
 function applyClassic(edits) {
   const applied = [];
 
-  if (edits.title) {
+  if ('title' in edits) {
     const title = document.getElementById('title');
     if (!title) throw new Error('Could not find the title field.');
     setFieldValue(title, edits.title);
     applied.push('title');
   }
 
-  if (edits.excerpt) {
+  if ('excerpt' in edits) {
     const excerpt = document.getElementById('excerpt');
     if (excerpt) {
       setFieldValue(excerpt, edits.excerpt);
@@ -771,7 +781,7 @@ function readSeoSnapshot() {
 function applySeoFields(edits) {
   const applied = [];
   for (const field of SEO_FIELDS) {
-    if (!edits[field.key]) continue;
+    if (!(field.key in edits)) continue;
     if (writeSeoField(field, edits[field.key])) applied.push(field.key);
   }
   return applied;
@@ -954,7 +964,7 @@ function applyAcfFields(edits, alreadyApplied) {
   const applied = [];
   const fields = listAcfFields();
   for (const key of ACF_SEMANTIC_KEYS) {
-    if (!edits[key]) continue;
+    if (!(key in edits)) continue;
     if (!writeAcfSemantic(fields, key, edits[key])) continue;
     if (!alreadyApplied.includes(key) && !applied.includes(key)) applied.push(key);
   }
@@ -1321,7 +1331,7 @@ function applyAcfBlocks(edits) {
     let changed = false;
 
     for (const semantic of ACF_SEMANTIC_KEYS) {
-      if (!edits[semantic]) continue;
+      if (!(semantic in edits)) continue;
       const slugMatches = (ACF_ALIASES[semantic] || []).includes(slug);
       const key = pickAcfDataKey(data, semantic, { allowGeneric: slugMatches });
       if (!key) continue;

@@ -8,9 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Overlay action buttons for **Internal links**, **Headline**, **Standfirst** and **SEO metadata**. **First sub** and **Footers** are shown with a SOON pill and are not usable yet.
+- Replies come back as reviewable suggestion cards. **Accept** writes only that field into the draft, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** / **Reconsider** put it back. Headline suggestions stay a pick-one list that marks the applied option.
+- Editor bridge accepts an opt-in `clear` list (title, excerpt, SEO, Open Graph, focus keyphrase) so **Undo** can restore a field that was blank before the suggestion was accepted. Body and selection are never cleared.
+- Beta badge in the overlay header, behind `SHOW_BETA_BADGE` in `content/chat-modal.js`.
+
 ### Changed
 
+- Overlay is named **Content Studio Assistant** (was Revision Assistant), and the welcome copy points at the action buttons.
+- SEO, Open Graph, excerpt, focus keyphrase and headline replies are no longer written straight into the draft — they wait on a card until accepted. Body and selection rewrites still apply as soon as the reply lands.
+- Internal links keeps its existing behaviour (reply plus the body edit) until `POST /api/plugin/chat` returns a `suggestions` array. Once it does, the overlay renders link cards and inserts the anchor itself.
+- The panel sizes to its content instead of always being 40rem tall.
 - Realtime connection failures show “Could not connect to Content Studio. Please try again later.” instead of asking the user to start Reverb.
+
+### Removed
+
+- Free-text composer is hidden for the beta behind `SHOW_FREE_CHAT`. The send path, prompt history and `PLUGIN_CHAT` wiring are unchanged, so the flag brings it back.
+- Draft checklist is hidden behind `SHOW_DRAFT_CHECKLIST`. The Images action and the greeting’s **I can also** list are gone from the overlay; the related-images prompt stays in the source.
 
 ## [0.7.1] - 2026-08-26
 

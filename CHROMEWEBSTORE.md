@@ -63,7 +63,7 @@ HOW TO USE
 2. Pin Content Studio and open the toolbar popup.
 3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, save the server, and allow access.
 4. Sign in to Content Studio, and Connect.
-5. Open a post or page in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Revision Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
+5. Open a post or page in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Content Studio Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
 6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
 
 PRIVACY
@@ -99,7 +99,7 @@ English
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `icons/icon-128.png` (copy in `store-assets/store-icon-128.png`) |
-| Screenshot 1 [REQUIRED] | 1280×800 or 640×400 | ⬜ Not created | Capture the Revision Assistant overlay on a Gutenberg draft |
+| Screenshot 1 [REQUIRED] | 1280×800 or 640×400 | ⬜ Not created | Capture the Content Studio Assistant overlay on a Gutenberg draft |
 | Screenshot 2 [RECOMMENDED] | 1280×800 or 640×400 | ⬜ Not created | Capture a reply that applied title/body/SEO edits |
 | Screenshot 3 [RECOMMENDED] | 1280×800 or 640×400 | ⬜ Not created | Capture the toolbar popup signed-in state (not Settings debug) |
 | Screenshot 4 | 1280×800 or 640×400 | ⬜ Not created | |
@@ -111,7 +111,7 @@ English
 
 Take these from a real editor session after login. Chrome Web Store rejects mock device frames and misleading UI.
 
-1. Gutenberg post editor, Revision Assistant open, greeting plus checklist visible, Immediate Media header logo showing.
+1. Gutenberg post editor, Content Studio Assistant open, greeting plus action row visible, Immediate Media header logo showing.
 2. After a rewrite: assistant reply, draft title or body changed, Save/Update showing unsaved changes.
 3. Toolbar popup: signed-in name and user icon in the header, Workspace feature grid for the assigned site (no Log in). Crop out any secrets.
 
@@ -218,7 +218,7 @@ How to configure
 4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
 
 WordPress
-Open [STAGING WP ADMIN on *.production.wcp.imdserve.com or *.release.wcp.imdserve.com] → Posts → Edit a draft (Gutenberg or Classic). The Revision Assistant should appear bottom-right.
+Open [STAGING WP ADMIN on *.production.wcp.imdserve.com or *.release.wcp.imdserve.com] → Posts → Edit a draft (Gutenberg or Classic). The Content Studio Assistant should appear bottom-right.
 
 Reviewer account (if provided)
 Email: [THROWAY ACCOUNT]
