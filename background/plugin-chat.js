@@ -73,7 +73,17 @@ async function collectPluginTelemetry() {
   return telemetry;
 }
 
-async function sendPluginChat({ message, history, article }, tabId) {
+const PLUGIN_CHAT_ACTIONS = [
+  'internal_links',
+  'headline',
+  'standfirst',
+  'seo',
+  'first_sub',
+  'footers',
+  'images',
+];
+
+async function sendPluginChat({ message, history, article, action }, tabId) {
   const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
 
   if (!apiHost || !apiToken) {
@@ -103,6 +113,7 @@ async function sendPluginChat({ message, history, article }, tabId) {
         message,
         history,
         article,
+        ...(PLUGIN_CHAT_ACTIONS.includes(action) ? { action } : {}),
         ...(Object.keys(telemetry).length > 0 ? { telemetry } : {}),
       }),
     });
@@ -141,6 +152,59 @@ function normaliseTitleVariants(raw) {
     .filter((value) => typeof value === 'string' && value.trim() !== '')
     .map((value) => value.trim())
     .slice(0, 5);
+}
+
+const SUGGESTION_FIELDS = [
+  'title',
+  'excerpt',
+  'seo_title',
+  'seo_description',
+  'og_title',
+  'og_description',
+  'focus_keyphrase',
+];
+
+/**
+ * Reviewable suggestion cards. Sanitised here so the WordPress page only ever
+ * sees keys the overlay knows how to render.
+ */
+function normaliseSuggestions(raw) {
+  if (!Array.isArray(raw)) return [];
+
+  const suggestions = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const id = typeof item.id === 'string' && item.id.trim() !== '' ? item.id.trim().slice(0, 100) : '';
+
+    if (item.kind === 'internal_link') {
+      const anchor = typeof item.anchor === 'string' ? item.anchor.trim() : '';
+      const url = typeof item.url === 'string' ? item.url.trim() : '';
+      if (!anchor || !url) continue;
+      suggestions.push({
+        kind: 'internal_link',
+        ...(id ? { id } : {}),
+        anchor: anchor.slice(0, 200),
+        url: url.slice(0, 2000),
+        target: typeof item.target === 'string' ? item.target.trim().slice(0, 300) : '',
+      });
+      continue;
+    }
+
+    if (item.kind !== 'field') continue;
+    const value = typeof item.value === 'string' ? item.value.trim() : '';
+    if (!SUGGESTION_FIELDS.includes(item.field) || !value) continue;
+    suggestions.push({
+      kind: 'field',
+      ...(id ? { id } : {}),
+      field: item.field,
+      value: value.slice(0, 2000),
+      ...(typeof item.label === 'string' && item.label.trim() !== ''
+        ? { label: item.label.trim().slice(0, 100) }
+        : {}),
+    });
+  }
+
+  return suggestions.slice(0, 20);
 }
 
 function normaliseEdits(raw) {

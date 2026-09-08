@@ -2530,6 +2530,7 @@ function bindComposer(root, initialAuth = {}) {
         message,
         history: transcript.slice(-MAX_HISTORY),
         article: compactArticle(article),
+        ...(state.activeAction ? { action: state.activeAction } : {}),
       });
 
       if (!accepted?.ok) {

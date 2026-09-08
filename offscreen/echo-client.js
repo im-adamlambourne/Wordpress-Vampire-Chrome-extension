@@ -25,9 +25,9 @@
     mod
   ));
 
-  // node_modules/pusher-js/dist/web/pusher.js
+  // ../../../node_modules/pusher-js/dist/web/pusher.js
   var require_pusher = __commonJS({
-    "node_modules/pusher-js/dist/web/pusher.js"(exports, module) {
+    "../../../node_modules/pusher-js/dist/web/pusher.js"(exports, module) {
       (function webpackUniversalModuleDefinition(root, factory) {
         if (typeof exports === "object" && typeof module === "object")
           module.exports = factory();
@@ -4093,7 +4093,7 @@
     }
   });
 
-  // node_modules/laravel-echo/dist/echo.js
+  // ../../../node_modules/laravel-echo/dist/echo.js
   var a = class {
     constructor() {
       this.notificationCreatedEvent = ".Illuminate\\Notifications\\Events\\BroadcastNotificationCreated";
@@ -5192,7 +5192,8 @@
         request_id: payload?.request_id,
         reply: payload?.reply,
         edits: payload?.edits,
-        title_variants: payload?.title_variants
+        title_variants: payload?.title_variants,
+        suggestions: payload?.suggestions
       });
     }).listen(".plugin.chat.failed", (payload) => {
       chrome.runtime.sendMessage({

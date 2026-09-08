@@ -187,6 +187,7 @@ function bindPluginChatListeners(channel) {
         reply: payload?.reply,
         edits: payload?.edits,
         title_variants: payload?.title_variants,
+        suggestions: payload?.suggestions,
       });
     })
     .listen('.plugin.chat.failed', (payload) => {
