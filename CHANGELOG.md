@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Chat requests no longer carry a stale `action` id. `state.activeAction` was only ever set, never cleared, so a free-text message or a draft-checklist prompt reported whichever action button ran last. Both surfaces are behind flags today, but the id is exactly what Content Studio is meant to branch on. Regenerate now passes the action explicitly.
+- Accepting an internal link no longer targets headings, captions, pull quotes or code blocks. The first match in the document was winning even when it was an `<h2>`, which is not where a link belongs; an anchor found only in those places is refused instead.
 - Realtime replies now carry `suggestions` through to the overlay. The offscreen Echo client and `deliverPluginChatResult` both rebuild the payload from a fixed key list, so the array was dropped twice before reaching the page and the suggestion-card contract could never have worked. Entries are sanitised in the service worker (unknown kinds, unknown fields and unknown keys are stripped, capped at 20) so the WordPress page only sees what the overlay can render.
 
 ## [0.7.1] - 2026-08-26

@@ -174,13 +174,14 @@ A proposed link, which the extension inserts itself.
 | `id` | no | Stable id for the card |
 
 **Do not also rewrite the body.** On accept, the extension finds the first occurrence of
-`anchor` that is not already inside an `<a>` and wraps it, then writes the result back as a
-body edit. If the reply *also* contains `edits.content`, that body rewrite applies
+`anchor` in body prose and wraps it, then writes the result back as a body edit. Text already
+inside a link is skipped, and so is anything inside a heading, caption, pull quote or code
+block — a link does not belong in those, so an anchor that only appears there is refused. If the reply *also* contains `edits.content`, that body rewrite applies
 immediately and defeats the whole review step.
 
-Anchors that do not appear in the body are shown as a card that fails on accept with
+Anchors that do not appear in body prose are shown as a card that fails on accept with
 "Could not find … in the body to link", so anchor text must be copied exactly from
-`article.content`, not paraphrased.
+`article.content`, not paraphrased — and ideally taken from a paragraph rather than a heading.
 
 ### How `suggestions` interacts with `edits`
 

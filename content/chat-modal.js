@@ -1987,9 +1987,13 @@ function normaliseReply(result) {
   return { suggestions, optionList, direct };
 }
 
+/** Places a link must never be inserted into, whatever the anchor matches. */
+const LINK_EXCLUDED_ANCESTORS = 'a, h1, h2, h3, h4, h5, h6, figcaption, blockquote, code, pre';
+
 /**
- * Wrap the first unlinked occurrence of `anchor` in the body HTML. Returns null
- * when the anchor text is not there, or is already inside a link.
+ * Wrap the first occurrence of `anchor` in body prose. Returns null when the
+ * anchor text is not there, is already inside a link, or only appears somewhere
+ * a link does not belong — a heading, a caption, a pull quote.
  */
 function insertLinkIntoBody(html, anchor, href) {
   const needle = String(anchor || '').trim();
@@ -1998,7 +2002,7 @@ function insertLinkIntoBody(html, anchor, href) {
   const doc = new DOMParser().parseFromString(`<body>${String(html || '')}</body>`, 'text/html');
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (node.parentElement?.closest('a')) continue;
+    if (node.parentElement?.closest(LINK_EXCLUDED_ANCESTORS)) continue;
     const index = node.data.indexOf(needle);
     if (index < 0) continue;
     const match = node.splitText(index);
@@ -2454,6 +2458,7 @@ function bindComposer(root, initialAuth = {}) {
       if (!prompt || state.busy) return;
 
       await sendUserMessage(prompt, {
+        actionId: state.activeAction,
         quiet: true,
         absorb: (model) => {
           const replacement = model.suggestions.find((item) => item.field === suggestion.field)
@@ -2502,7 +2507,7 @@ function bindComposer(root, initialAuth = {}) {
     const message = String(text || '').trim();
     if (!message) return;
 
-    if (actionId) state.activeAction = actionId;
+    state.activeAction = actionId;
     if (input) {
       input.value = '';
       input.removeAttribute('aria-invalid');
