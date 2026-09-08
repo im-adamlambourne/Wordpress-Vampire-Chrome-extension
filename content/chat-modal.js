@@ -1995,25 +1995,92 @@ const LINK_EXCLUDED_ANCESTORS = 'a, h1, h2, h3, h4, h5, h6, figcaption, blockquo
  * anchor text is not there, is already inside a link, or only appears somewhere
  * a link does not belong — a heading, a caption, a pull quote.
  */
-function insertLinkIntoBody(html, anchor, href) {
+function findLinkableText(html, anchor) {
   const needle = String(anchor || '').trim();
-  if (!needle || !href) return null;
+  if (!needle) return null;
 
   const doc = new DOMParser().parseFromString(`<body>${String(html || '')}</body>`, 'text/html');
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.parentElement?.closest(LINK_EXCLUDED_ANCESTORS)) continue;
     const index = node.data.indexOf(needle);
-    if (index < 0) continue;
-    const match = node.splitText(index);
-    match.splitText(needle.length);
-    const link = doc.createElement('a');
-    link.setAttribute('href', href);
-    link.textContent = needle;
-    match.replaceWith(link);
-    return doc.body.innerHTML;
+    if (index >= 0) return { doc, node, index, needle };
   }
   return null;
+}
+
+function insertLinkIntoBody(html, anchor, href) {
+  if (!href) return null;
+  const found = findLinkableText(html, anchor);
+  if (!found) return null;
+
+  const match = found.node.splitText(found.index);
+  match.splitText(found.needle.length);
+  const link = found.doc.createElement('a');
+  link.setAttribute('href', href);
+  link.textContent = found.needle;
+  match.replaceWith(link);
+  return found.doc.body.innerHTML;
+}
+
+/**
+ * Interim: read link suggestions out of a prose reply.
+ *
+ * The action asks the agent not to touch the body, so it answers with a bullet
+ * list rather than a body rewrite, and Content Studio does not send the
+ * `suggestions` array yet (see docs/plugin-chat-api.md). Until it does, pull the
+ * anchors and URLs out of the text so the cards work. Delete this once the API
+ * returns `suggestions` — `normaliseReply()` already prefers that.
+ *
+ * A line has to be a bullet carrying an http(s) URL and at least one quoted
+ * anchor; anything else is left in the reply untouched.
+ */
+function parseLinkSuggestionsFromReply(reply, articleContent) {
+  const lines = String(reply || '').split('\n');
+  const suggestions = [];
+  const kept = [];
+
+  lines.forEach((line, index) => {
+    const bullet = line.match(/^\s*(?:[-*\u2022\u00b7\u2013\u2014]|\d+[.)])\s+(.*)$/);
+    const url = bullet && bullet[1].match(/(https?:\/\/[^\s)<>"'`]+)/);
+    if (!bullet || !url) {
+      kept.push(line);
+      return;
+    }
+
+    const before = bullet[1].slice(0, url.index);
+    const after = bullet[1].slice(url.index + url[0].length);
+    const anchors = [...before.matchAll(/["\u201c]([^"\u201c\u201d]{2,160})["\u201d]/g)]
+      .map((match) => match[1].trim())
+      .filter(Boolean);
+    const href = safeLinkHref(url[0].replace(/[.,;:]+$/, ''));
+    if (anchors.length === 0 || !href) {
+      kept.push(line);
+      return;
+    }
+
+    // The agent often offers alternatives ("a" / "b"); take one that is really
+    // in the body so the card does not fail the moment it is accepted.
+    const anchor = anchors.find((candidate) => findLinkableText(articleContent, candidate)) || anchors[0];
+    const target = (after.match(/\(([^)]{3,200})\)/) || [])[1] || '';
+
+    suggestions.push({
+      id: `parsed-${index}`,
+      kind: 'internal_link',
+      label: 'Suggested internal link',
+      anchor,
+      href,
+      target: target.trim(),
+      status: 'pending',
+      note: '',
+      noteError: false,
+    });
+  });
+
+  return {
+    suggestions,
+    reply: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
 }
 
 function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
@@ -2556,6 +2623,24 @@ function bindComposer(root, initialAuth = {}) {
     if (result?.ok && typeof result.reply === 'string') {
       transcript.push({ role: 'assistant', content: result.reply });
       const model = normaliseReply(result);
+      let replyText = result.reply;
+
+      // Interim, until Content Studio sends `suggestions`: the internal-links
+      // action gets its links back as prose, so read them out of the text. Only
+      // when the reply carried no structured suggestions and no body rewrite of
+      // its own, so it can never fight either.
+      if (
+        state.activeAction === 'internal_links'
+        && model.suggestions.length === 0
+        && !model.direct.content
+      ) {
+        const parsed = parseLinkSuggestionsFromReply(replyText, article.content);
+        if (parsed.suggestions.length > 0) {
+          model.suggestions = parsed.suggestions;
+          replyText = parsed.reply || 'Here are internal links that could fit this draft.';
+        }
+      }
+
       const hasCards = model.suggestions.length > 0 || Boolean(model.optionList);
 
       // A regenerate swaps the value inside the existing card instead of
@@ -2580,7 +2665,7 @@ function bindComposer(root, initialAuth = {}) {
 
       appendMessage(messages, scroller, {
         role: 'assistant',
-        text: result.reply,
+        text: replyText,
         status,
         statusError,
       });

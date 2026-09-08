@@ -200,7 +200,7 @@ appear at all.
 
 | `action` | Prompt the extension sends | Expected reply |
 | --- | --- | --- |
-| `internal_links` | "Suggest relevant internal links for this draft. Don't change the draft, the post title or the body, and leave any existing internal links as they are." | `suggestions` of `kind: "internal_link"`, and **no** `edits.content`. Until this ships, the current behaviour (a body rewrite with links baked in) still works |
+| `internal_links` | "Suggest relevant internal links for this draft. Don't change the draft, the post title or the body, and leave any existing internal links as they are." | `suggestions` of `kind: "internal_link"`, and **no** `edits.content`. Until this ships the extension scrapes the anchors and URLs out of the prose reply, which works but is fragile — this is the action that most wants the structured array |
 | `headline` | "Suggest 5 alternative headlines for this draft. Do not change the draft yet." | `title_variants` (already supported), or `suggestions` with `field: "title"` |
 | `standfirst` | "Write a standfirst for this draft for the excerpt / description field. Do not change the post title or body." | `edits.excerpt`, or `suggestions` with `field: "excerpt"` |
 | `seo` | "Write the SEO title, SEO description, Open Graph title, Open Graph description, and focus keyphrase for this draft. Do not change the post title, body or excerpt." | `edits.seo_*` / `og_*` / `focus_keyphrase`, or the same as `suggestions`. One card per field |
