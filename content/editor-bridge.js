@@ -213,8 +213,26 @@ const ACF_ALIASES = {
     'focuskw',
     'keyphrase',
     'keyword',
+    'keyword_phrase',
+    'main_keyword_phrase',
   ],
 };
+
+/**
+ * Most specific semantic first. A WCP article has three fields labelled
+ * "Description" — the standfirst, Open Graph and SEO meta — so the generic
+ * excerpt match has to be tried only after the qualified ones have had a go.
+ */
+const ACF_MATCH_ORDER = [
+  'focus_keyphrase',
+  'seo_title',
+  'seo_description',
+  'og_title',
+  'og_description',
+  'title',
+  'excerpt',
+  'content',
+];
 const ACF_LABEL_ALIASES = {
   title: ['short headline', 'short title', 'display title', 'override title'],
   excerpt: [
@@ -227,6 +245,7 @@ const ACF_LABEL_ALIASES = {
     'strapline',
     'kicker',
     'sell',
+    'description',
   ],
   content: ['article body', 'main content', 'post content'],
   seo_title: ['seo title', 'meta title'],
@@ -238,7 +257,7 @@ const ACF_LABEL_ALIASES = {
     'facebook description',
     'social description',
   ],
-  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase'],
+  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase', 'keyword phrase', 'main keyword phrase'],
 };
 const ACF_GENERIC_DATA_KEYS = new Set([
   'description',
@@ -1076,14 +1095,29 @@ function normaliseAcfToken(value) {
     .replace(/^_|_$/g, '');
 }
 
+/**
+ * Three passes, each across every semantic in ACF_MATCH_ORDER, so a precise
+ * signal always beats a loose one: an exact field name beats a label, and a
+ * label beats a trailing name segment. Without that, "opengraph_description"
+ * would be claimed by the excerpt label alias before its own name matched.
+ */
 function semanticForAcfField(field) {
   const name = normaliseAcfToken(field.name);
   const label = String(field.label || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  for (const semantic of [...ACF_SEMANTIC_KEYS, 'content']) {
+
+  for (const semantic of ACF_MATCH_ORDER) {
     if ((ACF_ALIASES[semantic] || []).includes(name)) return semantic;
+  }
+  for (const semantic of ACF_MATCH_ORDER) {
     if ((ACF_LABEL_ALIASES[semantic] || []).some((alias) => label === alias || label.startsWith(`${alias} `))) {
       return semantic;
     }
+  }
+  // Prefixed names such as "im-wp-core-description" carry the alias last. The
+  // label falls back to the raw name when ACF renders no <label>, so this is
+  // the only signal left on those fields.
+  for (const semantic of ACF_MATCH_ORDER) {
+    if ((ACF_ALIASES[semantic] || []).some((alias) => name.endsWith(`_${alias}`))) return semantic;
   }
   return '';
 }
