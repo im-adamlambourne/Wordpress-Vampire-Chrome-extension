@@ -53,13 +53,18 @@ body {
 }
 
 body {
-  width: 800px;
-  min-height: 220px;
+  width: 380px;
+  min-height: 0;
   font-family: system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.4;
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+html.popup--workspace-grid body {
+  width: 800px;
+  min-height: 220px;
 }
 
 html:has(#settings-dialog[open]),

@@ -1,3 +1,14 @@
+/**
+ * Workspace feature grid in the signed-in toolbar popup. Hidden for the
+ * action-led beta; the catalog fetch, grid render, and Settings site picker
+ * stay wired, so flipping this back to true restores the launcher.
+ */
+const SHOW_WORKSPACE_GRID = false;
+
+if (SHOW_WORKSPACE_GRID) {
+  document.documentElement.classList.add('popup--workspace-grid');
+}
+
 const statusEl = document.getElementById('connection-status');
 const detailsEl = document.getElementById('session-details');
 const fieldsSection = document.getElementById('fields-section');
@@ -436,6 +447,11 @@ async function openWorkspaceFeature(site, feature) {
 }
 
 async function loadWorkspaceFeatures() {
+  if (!SHOW_WORKSPACE_GRID) {
+    hideWorkspace();
+    return;
+  }
+
   const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
   if (!apiHost || !apiToken) {
     hideWorkspace();
