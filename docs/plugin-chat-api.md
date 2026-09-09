@@ -90,7 +90,7 @@ reply back to the right tab.
     "url": "https://…/wp-admin/post.php?post=1234&action=edit"
   },
   "telemetry": {                          // omitted when nothing could be detected
-    "extension_version": "0.7.1",
+    "extension_version": "0.8.0",
     "os": "macOS", "os_version": "15.6",
     "browser": "Google Chrome", "browser_version": "…"
   }

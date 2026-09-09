@@ -16,7 +16,7 @@ Use **Private**, not Unlisted. Unlisted is installable by anyone who has the URL
 2. Pay the one-time developer registration fee if the dashboard asks for it.
 3. **Account** tab → **Trusted testers**: add staff Google accounts if you are not using domain publishing (each address must be a Google account).
 4. Confirm `https://content-studio.im/plugin/privacy` (and `https://develop.content-studio.im/plugin/privacy`) load **without signing in**. Reviewers open this link. Intranet or a login wall will fail review. Paste the production URL into **Privacy Policy URL** below and in the dashboard. Local Sail is `{APP_URL}/plugin/privacy` (this file is also at `docs/privacy-policy.html` if you need a gist fallback).
-5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.7.1.zip` as a new item.
+5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.8.0.zip` as a new item.
 6. As soon as the item exists, copy the **Item ID**. That ID is the production extension ID. Register this redirect on Content Studio (Laravel) before staff try store-build login:
 
    `https://<ITEM_ID>.chromiumapp.org/`
@@ -44,18 +44,16 @@ Revise WordPress drafts from a chat overlay. Sign in from the toolbar popup.
 
 **Detailed Description** [REQUIRED]
 
-Content Studio adds a revision assistant to Immediate Media WordPress Cloud Platform post editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) so you can chat about the open draft and apply suggested copy without leaving the page.
+Content Studio adds a revision assistant to Immediate Media WordPress Cloud Platform post editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) so you can improve the open draft without leaving the page.
 
 FEATURES
-• Chat overlay on Gutenberg and Classic editors (posts and pages).
-• Updates title, selected copy, body, excerpt, SEO title and description, Open Graph title and description, and focus keyphrase in the open draft.
+• Assistant overlay on Gutenberg and Classic editors (posts and pages), named Content Studio Assistant.
+• Action buttons for Internal links, Headline, Standfirst, and SEO metadata. Suggestions arrive as reviewable cards: Accept writes that field into the draft, Regenerate asks for another value, Reject dismisses it, Undo puts the previous value back.
+• Updates title, selected copy, body, excerpt, SEO title and description, Open Graph title and description, and focus keyphrase in the open draft (body and selection apply as soon as the reply lands; other fields wait until you Accept a card).
 • Works with Yoast, Rank Math, and matching Advanced Custom Fields text boxes for standfirst, excerpt, SEO, Open Graph, and keyphrase when those are the fields on screen.
-• Draft checklist flags missing or over-long title, excerpt, SEO, Open Graph, keyphrase, and a thin body. Click a gap to send a targeted prompt.
-• Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
-• If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
-• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; choose another from the Server host list in Settings → Show advanced settings. A notification confirms a successful login.
+• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; choose Production or Local from the Server host list in Settings → Show advanced settings. A notification confirms a successful login.
 • The signed-in toolbar popup shows your name, log out, and Settings. It does not show Workspace feature buttons in this build.
-• Chat replies arrive in the overlay after you send a message; you do not wait on a frozen page while the assistant works.
+• Replies arrive in the overlay after you pick an action; you do not wait on a frozen page while the assistant works.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
 
 HOW TO USE
@@ -64,7 +62,7 @@ HOW TO USE
 3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, pick a Server host, save, and allow access.
 4. Sign in to Content Studio, and Connect.
 5. Open a post or page in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Content Studio Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
-6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
+6. Choose an action (for example Headline or SEO metadata). Review the cards, Accept what you want, then save in WordPress yourself.
 
 PRIVACY
 The extension stores your server address (https://content-studio.im or https://develop.content-studio.im unless you change it to a local server), sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to that Content Studio server, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
@@ -83,13 +81,13 @@ This extension is for Immediate Media staff. It is not affiliated with Automatti
 SUPPORT
 Use the contact email on this listing or the Immediate Media Content Studio team.
 
-Version 0.7.1 — WordPress overlay limited to Immediate Media WCP admin hosts; optional access limited to Content Studio origins (Chrome Web Store Broad Host Permissions).
+Version 0.8.0 — Action-led overlay with reviewable suggestion cards (Internal links, Headline, Standfirst, SEO metadata); Workspace feature grid hidden for the beta.
 
 **Category** [REQUIRED]
 Productivity
 
 **Single Purpose** [REQUIRED]
-Lets a signed-in editor revise the open WordPress draft from a chat overlay (title, body, excerpt, SEO, Open Graph, and focus keyphrase) without saving or publishing.
+Lets a signed-in editor revise the open WordPress draft from an overlay (title, body, excerpt, SEO, Open Graph, and focus keyphrase) without saving or publishing.
 
 **Primary Language** [REQUIRED]
 English
@@ -112,7 +110,7 @@ English
 Take these from a real editor session after login. Chrome Web Store rejects mock device frames and misleading UI.
 
 1. Gutenberg post editor, Content Studio Assistant open, greeting plus action row visible, Immediate Media header logo showing.
-2. After a rewrite: assistant reply, draft title or body changed, Save/Update showing unsaved changes.
+2. After Headline or SEO: suggestion cards visible; after Accept, draft field changed and Save/Update showing unsaved changes.
 3. Toolbar popup: signed-in name and user icon in the header, Log in hidden (no Workspace feature grid). Crop out any secrets.
 
 Save files as `store-assets/screenshot-1.png` (1280×800 preferred). Do not put screenshots in the extension ZIP.
@@ -206,16 +204,16 @@ Paste into the Test instructions tab. Replace the bracketed staging values befor
 This item is a private Immediate Media staff tool. It is not meant for the public Chrome Web Store.
 
 What it does
-Opens a chat overlay on Immediate Media WordPress Cloud Platform post/page editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`, post.php / post-new.php). After Content Studio login, the user can ask for copy changes. Suggested title, body, selection, excerpt, SEO, Open Graph, and focus keyphrase are written into the open draft. It does not save or publish.
+Opens a Content Studio Assistant overlay on Immediate Media WordPress Cloud Platform post/page editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`, post.php / post-new.php). After Content Studio login, the editor picks an action (Internal links, Headline, Standfirst, SEO metadata). Headline, standfirst, and SEO suggestions are reviewable cards; Accept writes that field into the open draft. It does not save or publish.
 
 How to install
 Load the uploaded package. Pin the toolbar icon.
 
 How to configure
-1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings → Server host to change it).
+1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings → Server host to change it to Production or Local).
 2. Click Log in and allow the origin (and a second realtime origin if Chrome asks: `ws.` plus the hostname, or local port 8081) when Chrome prompts.
 3. Sign in → Connect.
-4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
+4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay (greeting and action row) appears on an editor tab. Signed-out overlay hides the actions and shows Sign in.
 
 WordPress
 Open [STAGING WP ADMIN on *.production.wcp.imdserve.com or *.release.wcp.imdserve.com] → Posts → Edit a draft (Gutenberg or Classic). The Content Studio Assistant should appear bottom-right.
@@ -226,9 +224,9 @@ Password: [THROWAY PASSWORD]
 Use only this account. Do not publish the test post.
 
 Try
-• Send “Tighten the title”.
+• Click Headline. Wait for suggestion cards. Accept one.
 • Confirm the editor title changes and Save/Update shows unsaved changes.
-• WordPress Undo should revert the title.
+• Undo on the card should restore the previous title. WordPress Undo should also revert the title.
 • Click the user icon in the popup header to log out; overlay hides the chat and shows Sign in.
 
 If you have no WordPress or Content Studio access
@@ -239,6 +237,7 @@ The popup still opens. Log in prompts for access to https://develop.content-stud
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 0.8.0 | 2026-09-09 | Action-led overlay: Internal links, Headline, Standfirst and SEO metadata as reviewable cards (Accept / Regenerate / Reject / Undo). Workspace feature grid and free-text chat hidden for the beta. Regenerating a card stays on that card. Popup host is a Production / Develop / Local dropdown. Default server remains Develop (`https://develop.content-studio.im`). | Released |
 | 0.7.1 | 2026-08-26 | Content scripts and overlay assets limited to Immediate Media WCP admin (`*.production.wcp.imdserve.com`, `*.release.wcp.imdserve.com`) and loopback. Optional hosts limited to Content Studio and realtime origins (no `http://*/*` / `https://*/*`) to clear Chrome Web Store Broad Host Permissions. Classic Editor **Add Footers** control stays in the media-button row but is hidden. Default Content Studio host is `https://develop.content-studio.im`. Public privacy policy at `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy`. | Draft |
 | 0.7.0 | 2026-08-20 | Signed-in toolbar popup shows Workspace feature buttons for the user’s assigned site (`GET /api/plugin/workspace`), using the same glyphs as the Workspace dashboard. Clicking a button opens `/workspace/{siteId}?feature={key}`. | Draft |
 | 0.6.0 | 2026-08-19 | Chat replies arrive over a realtime connection. Echo uses `broadcasting.host` from login (`POST /api/plugin/token`); Save host also requests a matching realtime origin (`localhost:8081` or `ws.{saved hostname}`). | Draft |

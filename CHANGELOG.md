@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-09
+
 ### Added
 
 - Overlay action buttons for **Internal links**, **Headline**, **Standfirst** and **SEO metadata**. **First sub** and **Footers** are shown with a SOON pill and are not usable yet.
