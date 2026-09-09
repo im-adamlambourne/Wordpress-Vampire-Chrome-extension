@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Overlay action buttons for **Internal links**, **Headline**, **Standfirst** and **SEO metadata**. **First sub** and **Footers** are shown with a SOON pill and are not usable yet.
-- Replies come back as reviewable suggestion cards. **Accept** writes only that field into the draft, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** / **Reconsider** put it back. Headline suggestions stay a pick-one list that marks the applied option.
+- Replies come back as reviewable suggestion cards. **Accept** writes only that field into the draft, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** / **Reconsider** put it back. A headline reply becomes one card per alternative rather than a pick-one list, so every suggestion carries the same three buttons. A field holds one value, so accepting a second headline returns the first card to pending and leaves **Undo** pointing at the headline the draft had before any of them.
 - Editor bridge accepts an opt-in `clear` list (title, excerpt, SEO, Open Graph, focus keyphrase) so **Undo** can restore a field that was blank before the suggestion was accepted. Body and selection are never cleared.
 - Beta badge in the overlay header, behind `SHOW_BETA_BADGE` in `content/chat-modal.js`.
 - Chat requests carry the `action` id of the overlay button that produced the prompt (`internal_links`, `headline`, `standfirst`, `seo`, and the reserved `first_sub`, `footers`, `images`), so Content Studio no longer has to infer intent from prompt wording. Omitted for free text.

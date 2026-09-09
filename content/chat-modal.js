@@ -130,7 +130,7 @@ const FIELD_ICONS = {
   focus_keyphrase: 'search',
 };
 const REGENERATE_PROMPTS = {
-  title: 'Suggest 5 different headlines for this draft. Do not change the draft yet.',
+  title: 'Write a different headline for this draft. Do not change the draft yet.',
   excerpt: 'Write a different standfirst for this draft. Do not change the post title or body.',
   seo_title: 'Write a different SEO title of 60 characters or fewer. Do not change the post title, body or excerpt.',
   seo_description: 'Write a different SEO description of 155 characters or fewer. Do not change the post title, body or excerpt.',
@@ -331,7 +331,6 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 .wpv-chat__signin-link:focus-visible,
 .wpv-chat__action:focus-visible,
 .wpv-chat__card-button:focus-visible,
-.wpv-chat__option:focus-visible,
 .wpv-chat__undo:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -1003,52 +1002,6 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   cursor: not-allowed;
 }
 
-.wpv-chat__options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-}
-
-.wpv-chat__option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--ws-hairline);
-  border-radius: 0.5rem;
-  background: var(--ws-well-4);
-  color: #fff;
-  font: inherit;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.wpv-chat__option:hover:not(:disabled) {
-  background: var(--ws-well-5);
-}
-
-.wpv-chat__option:disabled {
-  cursor: not-allowed;
-}
-
-.wpv-chat__option--applied {
-  border-color: var(--brand-600);
-}
-
-.wpv-chat__option-applied {
-  flex: none;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #7ee2fc;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .wpv-chat__window,
   .wpv-chat--open .wpv-chat__window,
@@ -1082,8 +1035,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   }
 
   .wpv-chat__action,
-  .wpv-chat__card-button,
-  .wpv-chat__option {
+  .wpv-chat__card-button {
     transition-duration: 0.05s;
   }
 }
@@ -1913,7 +1865,7 @@ function normaliseSuggestion(raw, index) {
   const value = String(raw.value ?? '').trim();
   if (!field || !value) return null;
   return {
-    id: nonEmptyString(raw.id) ? String(raw.id) : `field-${field}`,
+    id: nonEmptyString(raw.id) ? String(raw.id) : `field-${field}-${index}`,
     kind: 'field',
     field,
     label: nonEmptyString(raw.label) ? String(raw.label).trim() : FIELD_LABELS[field],
@@ -1922,6 +1874,26 @@ function normaliseSuggestion(raw, index) {
     note: '',
     noteError: false,
   };
+}
+
+/**
+ * Several cards can propose the same field — five headline alternatives, say.
+ * Left alone they would give every Accept button the same accessible name, so
+ * number them once it is known how many there are.
+ */
+function numberRepeatedLabels(suggestions) {
+  const totals = new Map();
+  for (const item of suggestions) {
+    if (item.kind !== 'field') continue;
+    totals.set(item.label, (totals.get(item.label) || 0) + 1);
+  }
+  const seen = new Map();
+  for (const item of suggestions) {
+    if (item.kind !== 'field' || (totals.get(item.label) || 0) < 2) continue;
+    const position = (seen.get(item.label) || 0) + 1;
+    seen.set(item.label, position);
+    item.label = `${item.label} ${position}`;
+  }
 }
 
 /**
@@ -1948,20 +1920,26 @@ function normaliseReply(result) {
 
   const covered = new Set(suggestions.map((item) => item.field).filter(Boolean));
 
+  // A headline reply is a list of alternatives. Each one becomes its own card
+  // so it gets the same Accept / Regenerate / Reject treatment as every other
+  // suggestion, rather than a pick-one row that behaves differently.
   const variants = (Array.isArray(result?.title_variants) ? result.title_variants : [])
     .filter(nonEmptyString)
     .map((title) => title.trim())
     .slice(0, 8);
-  let optionList = null;
   if (variants.length > 0 && !covered.has('title')) {
-    optionList = {
-      field: 'title',
-      label: FIELD_LABELS.title,
-      options: variants,
-      appliedIndex: -1,
-      note: '',
-      noteError: false,
-    };
+    variants.forEach((value, index) => {
+      suggestions.push({
+        id: `title-${index}`,
+        kind: 'field',
+        field: 'title',
+        label: FIELD_LABELS.title,
+        value,
+        status: 'pending',
+        note: '',
+        noteError: false,
+      });
+    });
     covered.add('title');
   }
 
@@ -1984,7 +1962,8 @@ function normaliseReply(result) {
     if (nonEmptyString(edits[key])) direct[key] = edits[key];
   }
 
-  return { suggestions, optionList, direct };
+  numberRepeatedLabels(suggestions);
+  return { suggestions, direct };
 }
 
 /** Places a link must never be inserted into, whatever the anchor matches. */
@@ -2120,7 +2099,7 @@ function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUnd
 }
 
 /** A single reviewable suggestion. Re-renders itself in place on state change. */
-function suggestionCard(suggestion, handlers) {
+function suggestionCard(suggestion, handlers, group = null) {
   const card = el('div', { className: 'wpv-chat__card' });
   const isLink = suggestion.kind === 'internal_link';
   const fieldLabel = isLink ? `internal link to ${suggestion.target || suggestion.href}` : suggestion.label;
@@ -2183,73 +2162,39 @@ function suggestionCard(suggestion, handlers) {
     handlers.onRendered?.();
   }
 
-  const view = { card, render };
+  const view = { card, render, suggestion, group };
   render();
   return view;
 }
 
-/** Headline / standfirst style pick-one list. */
-function optionListView(optionList, handlers) {
-  const wrap = el('div', {
-    className: 'wpv-chat__options',
-    role: 'group',
-    'aria-label': `${optionList.label} options`,
-  });
-
-  function render() {
-    const children = [];
-    if (optionList.appliedIndex >= 0) {
-      children.push(cardStateLine(`Applied to ${optionList.label.toLowerCase()}`, { tone: 'added' }));
-    }
-    if (optionList.note) {
-      children.push(cardStateLine(optionList.note, { tone: optionList.noteError ? 'error' : '' }));
-    }
-    optionList.options.forEach((text, index) => {
-      const applied = optionList.appliedIndex === index;
-      const button = el('button', {
-        type: 'button',
-        className: applied ? 'wpv-chat__option wpv-chat__option--applied' : 'wpv-chat__option',
-      }, [el('span', { text })]);
-      if (applied) {
-        button.appendChild(el('span', { className: 'wpv-chat__option-applied', text: 'Applied' }));
-      }
-      button.addEventListener('click', () => handlers.onPickOption(optionList, index, view));
-      children.push(button);
-    });
-    wrap.replaceChildren(...children);
-    handlers.onRendered?.();
-  }
-
-  const view = { wrap, render };
-  render();
-  return view;
+/**
+ * The other cards in this reply proposing a value for the same field. A field
+ * holds one value, so only one of them can be the accepted card.
+ */
+function fieldSiblings(view) {
+  const { field } = view.suggestion;
+  if (!field) return [];
+  return (view.group?.views || []).filter((item) => item !== view && item.suggestion.field === field);
 }
 
 function renderSuggestions(messages, model, handlers) {
-  const views = [];
+  const group = { views: [] };
   const row = el('li', { className: 'wpv-chat__suggestions' });
+  const cards = el('div', {
+    className: 'wpv-chat__cards',
+    role: 'group',
+    'aria-label': 'Suggestions',
+  });
 
-  if (model.optionList) {
-    const view = optionListView(model.optionList, handlers);
-    row.appendChild(view.wrap);
-    views.push(view);
-  }
-  if (model.suggestions.length > 0) {
-    const group = el('div', {
-      className: 'wpv-chat__cards',
-      role: 'group',
-      'aria-label': 'Suggestions',
-    });
-    for (const suggestion of model.suggestions) {
-      const view = suggestionCard(suggestion, handlers);
-      group.appendChild(view.card);
-      views.push(view);
-    }
-    row.appendChild(group);
+  for (const suggestion of model.suggestions) {
+    const view = suggestionCard(suggestion, handlers, group);
+    cards.appendChild(view.card);
+    group.views.push(view);
   }
 
+  row.appendChild(cards);
   messages.appendChild(row);
-  return views;
+  return group.views;
 }
 
 function setComposerEnabled(root, {
@@ -2302,7 +2247,7 @@ function setComposerEnabled(root, {
     action.setAttribute('aria-pressed', String(action.dataset.actionId === activeAction));
   }
   // Cards re-render themselves, so re-sync their controls every refresh.
-  for (const control of root.querySelectorAll('.wpv-chat__card-button, .wpv-chat__option, .wpv-chat__undo')) {
+  for (const control of root.querySelectorAll('.wpv-chat__card-button, .wpv-chat__undo')) {
     control.disabled = disabled;
   }
 }
@@ -2459,6 +2404,10 @@ function bindComposer(root, initialAuth = {}) {
         const article = await articleSnapshot();
         state.lastArticle = article;
 
+        // A field holds one value, so accepting a second headline replaces the
+        // first rather than adding to it.
+        const replaced = fieldSiblings(view).find((item) => item.suggestion.status === 'accepted');
+
         let applied;
         if (suggestion.kind === 'internal_link') {
           const body = String(article.content || '');
@@ -2472,7 +2421,11 @@ function bindComposer(root, initialAuth = {}) {
           suggestion.previous = body;
           applied = await applyEditorEdits({ content: linked });
         } else {
-          suggestion.previous = String(article[suggestion.field] || '');
+          // Undo goes back to what the draft held before any of these cards were
+          // accepted, not to the card this one is replacing.
+          suggestion.previous = replaced
+            ? replaced.suggestion.previous
+            : String(article[suggestion.field] || '');
           applied = await applyEditorEdits({ [suggestion.field]: suggestion.value });
         }
 
@@ -2483,6 +2436,12 @@ function bindComposer(root, initialAuth = {}) {
           suggestion.status = 'accepted';
           suggestion.note = '';
           suggestion.noteError = false;
+          if (replaced) {
+            replaced.suggestion.status = 'pending';
+            replaced.suggestion.note = '';
+            replaced.suggestion.noteError = false;
+            replaced.render();
+          }
         }
         view.render();
       });
@@ -2528,10 +2487,7 @@ function bindComposer(root, initialAuth = {}) {
         actionId: state.activeAction,
         quiet: true,
         absorb: (model) => {
-          const replacement = model.suggestions.find((item) => item.field === suggestion.field)
-            || (model.optionList?.field === suggestion.field
-              ? { value: model.optionList.options[0] }
-              : null);
+          const replacement = model.suggestions.find((item) => item.field === suggestion.field);
           if (!replacement || !nonEmptyString(replacement.value)) return false;
           suggestion.value = replacement.value;
           suggestion.status = 'pending';
@@ -2540,23 +2496,6 @@ function bindComposer(root, initialAuth = {}) {
           view.render();
           return true;
         },
-      });
-    },
-
-    onPickOption(optionList, index, view) {
-      const value = optionList.options[index];
-      if (!nonEmptyString(value)) return undefined;
-      return withBusy(async () => {
-        const applied = await applyEditorEdits({ [optionList.field]: value });
-        if (applied.statusError) {
-          optionList.note = applied.status;
-          optionList.noteError = true;
-        } else {
-          optionList.appliedIndex = index;
-          optionList.note = '';
-          optionList.noteError = false;
-        }
-        view.render();
       });
     },
   };
@@ -2641,7 +2580,7 @@ function bindComposer(root, initialAuth = {}) {
         }
       }
 
-      const hasCards = model.suggestions.length > 0 || Boolean(model.optionList);
+      const hasCards = model.suggestions.length > 0;
 
       // A regenerate swaps the value inside the existing card instead of
       // stacking another bubble on the transcript.

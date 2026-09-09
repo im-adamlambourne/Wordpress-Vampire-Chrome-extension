@@ -176,7 +176,6 @@
 .wpv-chat__signin-link:focus-visible,
 .wpv-chat__action:focus-visible,
 .wpv-chat__card-button:focus-visible,
-.wpv-chat__option:focus-visible,
 .wpv-chat__undo:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -848,52 +847,6 @@
   cursor: not-allowed;
 }
 
-.wpv-chat__options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-}
-
-.wpv-chat__option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--ws-hairline);
-  border-radius: 0.5rem;
-  background: var(--ws-well-4);
-  color: #fff;
-  font: inherit;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.wpv-chat__option:hover:not(:disabled) {
-  background: var(--ws-well-5);
-}
-
-.wpv-chat__option:disabled {
-  cursor: not-allowed;
-}
-
-.wpv-chat__option--applied {
-  border-color: var(--brand-600);
-}
-
-.wpv-chat__option-applied {
-  flex: none;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #7ee2fc;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .wpv-chat__window,
   .wpv-chat--open .wpv-chat__window,
@@ -927,8 +880,7 @@
   }
 
   .wpv-chat__action,
-  .wpv-chat__card-button,
-  .wpv-chat__option {
+  .wpv-chat__card-button {
     transition-duration: 0.05s;
   }
 }

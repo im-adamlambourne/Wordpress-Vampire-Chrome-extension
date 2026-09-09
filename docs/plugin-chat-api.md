@@ -157,6 +157,11 @@ A single value proposed for one editor field.
 | `label` | no | Card heading. Defaults to the extension's own name for the field |
 | `id` | no | Stable id for the card. Generated when absent |
 
+Repeating the same `field` is allowed and is how you offer a choice: each entry becomes its
+own card, the labels are numbered when they would otherwise read alike, and accepting one
+returns whichever card was accepted before it to pending. That is what a headline reply
+looks like, whether it arrives as `title_variants` or as repeated `field: "title"` entries.
+
 `content` and `selection` are **not** valid `field` values. A body or selection rewrite
 cannot be reviewed sentence by sentence, so those stay on `edits` and apply as soon as the
 reply lands.
@@ -188,7 +193,7 @@ Anchors that do not appear in body prose are shown as a card that fails on accep
 The extension merges both into one list, with `suggestions` winning:
 
 1. Every valid `suggestions` entry becomes a card.
-2. `title_variants` becomes a pick-one list — unless a suggestion already covers `title`.
+2. `title_variants` becomes one card per alternative — unless a suggestion already covers `title`.
 3. Any `edits` key in the field list above that is **not** already covered becomes a card.
 4. `edits.content` and `edits.selection` are applied to the draft straight away.
 
@@ -201,7 +206,7 @@ appear at all.
 | `action` | Prompt the extension sends | Expected reply |
 | --- | --- | --- |
 | `internal_links` | "Suggest relevant internal links for this draft. Don't change the draft, the post title or the body, and leave any existing internal links as they are." | `suggestions` of `kind: "internal_link"`, and **no** `edits.content`. Until this ships the extension scrapes the anchors and URLs out of the prose reply, which works but is fragile — this is the action that most wants the structured array |
-| `headline` | "Suggest 5 alternative headlines for this draft. Do not change the draft yet." | `title_variants` (already supported), or `suggestions` with `field: "title"` |
+| `headline` | "Suggest 5 alternative headlines for this draft. Do not change the draft yet." | `title_variants` (already supported), or one `suggestions` entry per alternative with `field: "title"`. One card each |
 | `standfirst` | "Write a standfirst for this draft for the excerpt / description field. Do not change the post title or body." | `edits.excerpt`, or `suggestions` with `field: "excerpt"` |
 | `seo` | "Write the SEO title, SEO description, Open Graph title, Open Graph description, and focus keyphrase for this draft. Do not change the post title, body or excerpt." | `edits.seo_*` / `og_*` / `focus_keyphrase`, or the same as `suggestions`. One card per field |
 | `first_sub` | *(not yet exposed)* | Reserved |
@@ -270,6 +275,6 @@ an opaque body rewrite.
   presumably should be too.
 - **First sub** has no prompt or response shape yet — the action id is reserved but the
   behaviour is undefined.
-- **Multiple values per field.** The current model is one card per field, plus the
-  headline pick-one list. If SEO titles should also offer a choice of three, that needs
-  either repeated `field` entries or an `options` array — worth deciding before step 3.
+- **Should other fields offer a choice?** Repeated `field` entries already work, so
+  three SEO titles would render as three cards today. Whether that is useful or just noise
+  is a call for step 3.
