@@ -14,6 +14,7 @@ extension side of everything below is already shipped — see
 | --- | --- | --- |
 | `message`, `history`, `article`, `telemetry` | request | Shipped, unchanged |
 | `article.method_steps` / `edits.method_steps` | both | **New.** Recipe (`sxs-recipe`) only. Applies immediately, like `content` |
+| `article.list_items` / `edits.list_items` | both | **New.** List (`list`) only. Editorial comments. Applies immediately, like `content` |
 | `action` | request | **New.** Sent by the extension now; Laravel may ignore it safely |
 | `reply`, `edits`, `title_variants` | realtime reply | Shipped, unchanged |
 | `suggestions` | realtime reply | **New.** Extension parses and renders it; nothing sends it yet |
@@ -90,6 +91,7 @@ reply back to the right tab.
     "post_type": "post",
     "url": "https://…/wp-admin/post.php?post=1234&action=edit"
     // "method_steps": [{ "kind": "step", "text": "…" }]  // sxs-recipe only
+    // "list_items": [{ "kind": "item", "text": "…" }]    // list only
   },
   "telemetry": {                          // omitted when nothing could be detected
     "extension_version": "0.8.0",
@@ -108,7 +110,14 @@ Notes:
 - On `post_type: "sxs-recipe"` the snapshot also sends `article.method_steps`, an array of
   `{ "kind": "heading"|"step", "text": "…" }` rows from the ACF method flexible field
   (max 30 rows, 2000 chars each). Omitted on every other post type. A method rewrite
-  comes back on `edits.method_steps` and applies immediately, like `content`.
+  comes back on `edits.method_steps` and applies immediately, like `content`. Internal
+  link anchors on a recipe must appear in a method **step**, not in Classic `#content`.
+- On `post_type: "list"` the snapshot also sends `article.list_items`, an array of
+  `{ "kind": "item", "text": "…" }` editorial comments from the ACF list flexible
+  field (max 40 rows, 4000 chars each). Omitted on every other post type. A list-item
+  rewrite comes back on `edits.list_items` and applies immediately, like `content`.
+  Internal link anchors on a list must appear in an editorial comment, not in Classic
+  `#content` and not in the "RT says:" heading.
 - The snapshot is best-effort DOM/`wp.data` reading. Any field can be an empty string.
 
 ### `action`
@@ -168,8 +177,8 @@ own card, the labels are numbered when they would otherwise read alike, and acce
 returns whichever card was accepted before it to pending. That is what a headline reply
 looks like, whether it arrives as `title_variants` or as repeated `field: "title"` entries.
 
-`content`, `selection`, and `method_steps` are **not** valid `field` values. A body,
-selection, or method rewrite cannot be reviewed sentence by sentence, so those stay on
+`content`, `selection`, `method_steps`, and `list_items` are **not** valid `field` values. A body,
+selection, method, or list-item rewrite cannot be reviewed sentence by sentence, so those stay on
 `edits` and apply as soon as the reply lands.
 
 ### `kind: "internal_link"`
@@ -179,20 +188,25 @@ A proposed link, which the extension inserts itself.
 | Key | Required | Notes |
 | --- | --- | --- |
 | `kind` | yes | `"internal_link"` |
-| `anchor` | yes | Existing body text to link. Must appear verbatim in `article.content` |
+| `anchor` | yes | Existing prose to link. Must appear verbatim in `article.content`, a method **step** on `sxs-recipe`, or a list item editorial comment on `list` |
 | `url` | yes | Link target. A missing scheme is upgraded to `https://`; anything not http(s) is dropped |
 | `target` | no | Human label for the destination, shown in bold on the card |
 | `id` | no | Stable id for the card |
 
-**Do not also rewrite the body.** On accept, the extension finds the first occurrence of
-`anchor` in body prose and wraps it, then writes the result back as a body edit. Text already
-inside a link is skipped, and so is anything inside a heading, caption, pull quote or code
-block — a link does not belong in those, so an anchor that only appears there is refused. If the reply *also* contains `edits.content`, that body rewrite applies
-immediately and defeats the whole review step.
+**Do not also rewrite the body, method, or list items.** On accept, the extension finds
+the first occurrence of `anchor` and wraps it: body prose on a `post`, method **step**
+text on `sxs-recipe`, list item **editorial comments** on `list` (headings and Classic
+`#content` are skipped). The result is written back as `edits.content`,
+`edits.method_steps`, or `edits.list_items`. Text already inside a link is skipped,
+and so is anything inside a heading, caption, pull quote or code block — a link does not
+belong in those, so an anchor that only appears there is refused. If the reply *also*
+contains `edits.content`, `edits.method_steps`, or `edits.list_items`, that rewrite
+applies immediately and defeats the whole review step.
 
-Anchors that do not appear in body prose are shown as a card that fails on accept with
-"Could not find … in the body to link", so anchor text must be copied exactly from
-`article.content`, not paraphrased — and ideally taken from a paragraph rather than a heading.
+Anchors that do not appear in the linkable prose are shown as a card that fails on accept
+with "Could not find … in the body to link" (or "method steps" / "list items"),
+so anchor text must be copied exactly from the haystack, not paraphrased — and ideally
+taken from a paragraph, step, or editorial comment rather than a heading.
 
 ### How `suggestions` interacts with `edits`
 
@@ -201,8 +215,8 @@ The extension merges both into one list, with `suggestions` winning:
 1. Every valid `suggestions` entry becomes a card.
 2. `title_variants` becomes one card per alternative — unless a suggestion already covers `title`.
 3. Any `edits` key in the field list above that is **not** already covered becomes a card.
-4. `edits.content`, `edits.selection`, and `edits.method_steps` are applied to the draft
-   straight away.
+4. `edits.content`, `edits.selection`, `edits.method_steps`, and `edits.list_items` are
+   applied to the draft straight away.
 
 So a reply that sends only `edits` still produces cards. Sending `suggestions` is about
 control — labels, ordering, multiple values, and link metadata — not about whether cards
@@ -212,7 +226,7 @@ appear at all.
 
 | `action` | Prompt the extension sends | Expected reply |
 | --- | --- | --- |
-| `internal_links` | "Suggest relevant internal links for this draft. Don't change the draft, the post title or the body, and leave any existing internal links as they are." | `suggestions` of `kind: "internal_link"`, and **no** `edits.content`. Until this ships the extension scrapes the anchors and URLs out of the prose reply, which works but is fragile — this is the action that most wants the structured array |
+| `internal_links` | "Suggest relevant internal links for this draft. Don't change the draft, the post title or the body, and leave any existing internal links as they are." | `suggestions` of `kind: "internal_link"`, and **no** `edits.content` / `edits.method_steps` / `edits.list_items`. On `sxs-recipe` the overlay inserts into method steps; on `list`, into editorial comments. Until this ships the extension scrapes the anchors and URLs out of the prose reply, which works but is fragile — this is the action that most wants the structured array |
 | `headline` | "Suggest 5 alternative headlines for this draft. Do not change the draft yet." | `title_variants` (already supported), or one `suggestions` entry per alternative with `field: "title"`. One card each |
 | `standfirst` | "Write a standfirst for this draft for the excerpt / description field. Do not change the post title or body." | `edits.excerpt`, or `suggestions` with `field: "excerpt"` |
 | `seo` | "Write the SEO title, SEO description, Open Graph title, Open Graph description, and focus keyphrase for this draft. Do not change the post title, body or excerpt." | `edits.seo_*` / `og_*` / `focus_keyphrase`, or the same as `suggestions`. One card per field |
@@ -260,6 +274,7 @@ nothing breaks if a value is longer — it is cut, not rejected.
 | `edits.excerpt` | 2000 chars |
 | `edits.content` | 20000 chars |
 | `edits.method_steps` | 30 rows, 2000 chars per `text`, ~20000 chars combined |
+| `edits.list_items` | 40 rows, 4000 chars per `text`, ~40000 chars combined |
 | `edits.selection` | 8000 chars |
 | `seo_title`, `og_title`, `focus_keyphrase` | 200 chars |
 | `seo_description`, `og_description` | 500 chars |

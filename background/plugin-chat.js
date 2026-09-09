@@ -228,6 +228,8 @@ function normaliseEdits(raw) {
   }
   const methodSteps = normaliseMethodSteps(raw.method_steps);
   if (methodSteps.length > 0) edits.method_steps = methodSteps;
+  const listItems = normaliseListItems(raw.list_items);
+  if (listItems.length > 0) edits.list_items = listItems;
   return edits;
 }
 

@@ -1536,6 +1536,7 @@ function fallbackArticleSnapshot() {
     post_type: '',
     url: location.href,
     method_steps: [],
+    list_items: [],
   };
 }
 
@@ -1581,13 +1582,17 @@ async function articleSnapshot() {
       selection: result.snapshot.selection || fallback.selection,
       editor_type: result.snapshot.editor_type || fallback.editor_type,
       post_type: result.snapshot.post_type || fallback.post_type,
-      method_steps: Array.isArray(result.snapshot.method_steps)
-        ? result.snapshot.method_steps
-        : fallback.method_steps,
+      method_steps: pickSnapshotRows(result.snapshot.method_steps, fallback.method_steps),
+      list_items: pickSnapshotRows(result.snapshot.list_items, fallback.list_items),
     };
   } catch {
     return fallback;
   }
+}
+
+function pickSnapshotRows(primary, fallback) {
+  if (Array.isArray(primary) && primary.length > 0) return primary;
+  return Array.isArray(fallback) ? fallback : [];
 }
 
 function compactArticle(article) {
@@ -1604,6 +1609,11 @@ function compactArticle(article) {
     next.method_steps = normaliseMethodSteps(next.method_steps);
   } else {
     delete next.method_steps;
+  }
+  if (fieldsForPostType(next.post_type).includes('list_items')) {
+    next.list_items = normaliseListItems(next.list_items);
+  } else {
+    delete next.list_items;
   }
   return next;
 }
@@ -1683,6 +1693,7 @@ function checklistItems(article) {
 function hasEdits(edits) {
   if (!edits || typeof edits !== 'object') return false;
   if (Array.isArray(edits.method_steps) && edits.method_steps.length > 0) return true;
+  if (Array.isArray(edits.list_items) && edits.list_items.length > 0) return true;
   return EDIT_KEYS.some((key) => (
     typeof edits[key] === 'string' && edits[key].trim() !== ''
   ));
@@ -1700,6 +1711,7 @@ function describeApplied(applied) {
     og_description: 'Open Graph description',
     focus_keyphrase: 'focus keyphrase',
     method_steps: 'method steps',
+    list_items: 'list items',
   };
   const parts = (Array.isArray(applied) ? applied : [])
     .map((key) => labels[key])
@@ -1781,12 +1793,24 @@ async function inferAppliedFields(edits) {
     && methodStepsLookApplied(article.method_steps, edits.method_steps)) {
     applied.push('method_steps');
   }
+  if (Array.isArray(edits.list_items) && edits.list_items.length > 0
+    && listItemsLookApplied(article.list_items, edits.list_items)) {
+    applied.push('list_items');
+  }
   return applied;
 }
 
 function methodStepsLookApplied(current, next) {
   const a = normaliseMethodSteps(current);
   const b = normaliseMethodSteps(next);
+  if (a.length === 0 || b.length === 0) return false;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => row.kind === b[index].kind && row.text === b[index].text);
+}
+
+function listItemsLookApplied(current, next) {
+  const a = typeof normaliseListItems === 'function' ? normaliseListItems(current) : [];
+  const b = typeof normaliseListItems === 'function' ? normaliseListItems(next) : [];
   if (a.length === 0 || b.length === 0) return false;
   if (a.length !== b.length) return false;
   return a.every((row, index) => row.kind === b[index].kind && row.text === b[index].text);
@@ -2004,6 +2028,8 @@ function normaliseReply(result) {
   }
   const methodSteps = normaliseMethodSteps(edits.method_steps);
   if (methodSteps.length > 0) direct.method_steps = methodSteps;
+  const listItems = typeof normaliseListItems === 'function' ? normaliseListItems(edits.list_items) : [];
+  if (listItems.length > 0) direct.list_items = listItems;
 
   numberRepeatedLabels(suggestions);
   return { suggestions, direct };
@@ -2045,6 +2071,99 @@ function insertLinkIntoBody(html, anchor, href) {
   return found.doc.body.innerHTML;
 }
 
+function articleLinksApplyToMethodSteps(article) {
+  return typeof linksApplyToMethodSteps === 'function'
+    && linksApplyToMethodSteps(article?.post_type);
+}
+
+function articleLinksApplyToListItems(article) {
+  return typeof linksApplyToListItems === 'function'
+    && linksApplyToListItems(article?.post_type);
+}
+
+function cloneMethodSteps(steps) {
+  const normalise = typeof normaliseMethodSteps === 'function' ? normaliseMethodSteps : () => [];
+  return normalise(steps).map((row) => ({ kind: row.kind, text: row.text }));
+}
+
+function insertLinkIntoMethodSteps(steps, anchor, href) {
+  const next = cloneMethodSteps(steps);
+  for (const row of next) {
+    if (row.kind !== 'step') continue;
+    const linked = insertLinkIntoBody(row.text, anchor, href);
+    if (linked === null) continue;
+    row.text = linked;
+    return next;
+  }
+  return null;
+}
+
+function cloneListItems(items) {
+  const normalise = typeof normaliseListItems === 'function' ? normaliseListItems : () => [];
+  return normalise(items).map((row) => ({ kind: row.kind, text: row.text }));
+}
+
+function insertLinkIntoListItems(items, anchor, href) {
+  const next = cloneListItems(items);
+  for (const row of next) {
+    const linked = insertLinkIntoBody(row.text, anchor, href);
+    if (linked === null) continue;
+    row.text = linked;
+    return next;
+  }
+  return null;
+}
+
+function findLinkableInArticle(article, anchor) {
+  if (articleLinksApplyToMethodSteps(article)) {
+    const texts = typeof methodStepLinkTexts === 'function'
+      ? methodStepLinkTexts(article.method_steps)
+      : [];
+    return texts.some((text) => findLinkableText(text, anchor));
+  }
+  if (articleLinksApplyToListItems(article)) {
+    const texts = typeof listItemLinkTexts === 'function'
+      ? listItemLinkTexts(article.list_items)
+      : [];
+    return texts.some((text) => findLinkableText(text, anchor));
+  }
+  return !!findLinkableText(article?.content, anchor);
+}
+
+function linkTargetLabel(article) {
+  if (articleLinksApplyToMethodSteps(article)) return 'method steps';
+  if (articleLinksApplyToListItems(article)) return 'list items';
+  return 'body';
+}
+
+function applyInternalLink(article, suggestion) {
+  if (articleLinksApplyToMethodSteps(article)) {
+    const linked = insertLinkIntoMethodSteps(article.method_steps, suggestion.anchor, suggestion.href);
+    if (!linked) return null;
+    return {
+      previous: { method_steps: cloneMethodSteps(article.method_steps) },
+      edits: { method_steps: linked },
+    };
+  }
+
+  if (articleLinksApplyToListItems(article)) {
+    const linked = insertLinkIntoListItems(article.list_items, suggestion.anchor, suggestion.href);
+    if (!linked) return null;
+    return {
+      previous: { list_items: cloneListItems(article.list_items) },
+      edits: { list_items: linked },
+    };
+  }
+
+  const body = String(article.content || '');
+  const linked = insertLinkIntoBody(body, suggestion.anchor, suggestion.href);
+  if (!linked) return null;
+  return {
+    previous: { content: body },
+    edits: { content: linked },
+  };
+}
+
 /**
  * Interim: read link suggestions out of a prose reply.
  *
@@ -2057,7 +2176,7 @@ function insertLinkIntoBody(html, anchor, href) {
  * A line has to be a bullet carrying an http(s) URL and at least one quoted
  * anchor; anything else is left in the reply untouched.
  */
-function parseLinkSuggestionsFromReply(reply, articleContent) {
+function parseLinkSuggestionsFromReply(reply, article) {
   const lines = String(reply || '').split('\n');
   const suggestions = [];
   const kept = [];
@@ -2082,8 +2201,11 @@ function parseLinkSuggestionsFromReply(reply, articleContent) {
     }
 
     // The agent often offers alternatives ("a" / "b"); take one that is really
-    // in the body so the card does not fail the moment it is accepted.
-    const anchor = anchors.find((candidate) => findLinkableText(articleContent, candidate)) || anchors[0];
+    // in the draft so the card does not fail the moment it is accepted.
+    const haystack = typeof article === 'object' && article !== null
+      ? article
+      : { content: article };
+    const anchor = anchors.find((candidate) => findLinkableInArticle(haystack, candidate)) || anchors[0];
     const target = (after.match(/\(([^)]{3,200})\)/) || [])[1] || '';
 
     suggestions.push({
@@ -2495,16 +2617,15 @@ function bindComposer(root, initialAuth = {}) {
 
         let applied;
         if (suggestion.kind === 'internal_link') {
-          const body = String(article.content || '');
-          const linked = insertLinkIntoBody(body, suggestion.anchor, suggestion.href);
+          const linked = applyInternalLink(article, suggestion);
           if (!linked) {
-            suggestion.note = `Could not find "${suggestion.anchor}" in the body to link.`;
+            suggestion.note = `Could not find "${suggestion.anchor}" in the ${linkTargetLabel(article)} to link.`;
             suggestion.noteError = true;
             view.render();
             return;
           }
-          suggestion.previous = body;
-          applied = await applyEditorEdits({ content: linked });
+          suggestion.previous = linked.previous;
+          applied = await applyEditorEdits(linked.edits);
         } else {
           // Undo goes back to what the draft held before any of these cards were
           // accepted, not to the card this one is replacing.
@@ -2549,7 +2670,11 @@ function bindComposer(root, initialAuth = {}) {
     onUndo(suggestion, view) {
       return withBusy(async () => {
         const applied = suggestion.kind === 'internal_link'
-          ? await applyEditorEdits({ content: suggestion.previous })
+          ? await applyEditorEdits(
+            suggestion.previous && typeof suggestion.previous === 'object'
+              ? suggestion.previous
+              : { content: suggestion.previous },
+          )
           : await restoreEditorField(suggestion.field, suggestion.previous);
 
         if (applied.statusError) {
@@ -2672,14 +2797,16 @@ function bindComposer(root, initialAuth = {}) {
 
       // Interim, until Content Studio sends `suggestions`: the internal-links
       // action gets its links back as prose, so read them out of the text. Only
-      // when the reply carried no structured suggestions and no body rewrite of
-      // its own, so it can never fight either.
+      // when the reply carried no structured suggestions and no body or method
+      // rewrite of its own, so it can never fight either.
       if (
         state.activeAction === 'internal_links'
         && model.suggestions.length === 0
         && !model.direct.content
+        && !model.direct.method_steps
+        && !model.direct.list_items
       ) {
-        const parsed = parseLinkSuggestionsFromReply(replyText, article.content);
+        const parsed = parseLinkSuggestionsFromReply(replyText, article);
         if (parsed.suggestions.length > 0) {
           model.suggestions = parsed.suggestions;
           replyText = parsed.reply || 'Here are internal links that could fit this draft.';

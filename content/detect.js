@@ -234,6 +234,9 @@ function detectArticleSnapshot() {
   if (postTypeAllowsMethodSteps(postType)) {
     snapshot.method_steps = detectMethodSteps();
   }
+  if (postTypeAllowsListItems(postType)) {
+    snapshot.list_items = detectListItems();
+  }
   return snapshot;
 }
 
@@ -241,6 +244,8 @@ const METHOD_FLEX_KEY = 'field_sxs-method-recipe-flex';
 const METHOD_STEP_KEY = 'field_sxs-method-recipe-step';
 const METHOD_HEADING_LAYOUT = 'sxs-method-recipe-heading';
 const METHOD_STEP_LAYOUT = 'sxs-method-recipe-step';
+const LIST_FLEX_KEY = 'field_acf_bs_show_listmeta-list_items';
+const LIST_COMMENT_KEY = 'field_acf_bs_show_listmeta-list_items-broadcast_content-editorial_comment';
 
 function detectMethodSteps() {
   const root = document.querySelector(`.acf-field[data-key="${METHOD_FLEX_KEY}"]`);
@@ -257,16 +262,20 @@ function detectMethodSteps() {
 }
 
 function methodLayouts(root) {
-  return [...root.querySelectorAll('.values > .layout')].filter((el) => (
+  const real = (els) => [...els].filter((el) => (
     !el.classList.contains('acf-clone')
     && el.getAttribute('data-id') !== 'acfcloneindex'
   ));
+  const preferred = real(root.querySelectorAll('.values > .layout'));
+  if (preferred.length > 0) return preferred;
+  return real(root.querySelectorAll('.layout[data-id], .acf-row[data-id]'));
 }
 
 function methodLayoutKind(layout) {
   const name = String(layout.getAttribute('data-layout') || '');
-  if (name === METHOD_HEADING_LAYOUT) return 'heading';
-  if (name === METHOD_STEP_LAYOUT) return 'step';
+  if (name === METHOD_HEADING_LAYOUT || name.endsWith('-heading')) return 'heading';
+  if (name === METHOD_STEP_LAYOUT || name.endsWith('-step')) return 'step';
+  if (layout.querySelector(`.acf-field[data-key="${METHOD_STEP_KEY}"]`)) return 'step';
   return '';
 }
 
@@ -283,6 +292,32 @@ function methodLayoutText(layout, kind) {
   if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
   const input = layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
   return input && typeof input.value === 'string' ? input.value.trim() : '';
+}
+
+function detectListItems() {
+  const root = document.querySelector(`.acf-field[data-key="${LIST_FLEX_KEY}"]`);
+  if (!root) return [];
+
+  const preferred = [...root.querySelectorAll('.values > .layout')];
+  const rows = preferred.length > 0
+    ? preferred
+    : [...root.querySelectorAll('.layout[data-id], .acf-row[data-id]')];
+
+  const items = [];
+  for (const layout of rows) {
+    if (layout.classList.contains('acf-clone') || layout.getAttribute('data-id') === 'acfcloneindex') {
+      continue;
+    }
+    const textarea = layout.querySelector(
+      `textarea[name*="[${LIST_COMMENT_KEY}]"], textarea[name*="${LIST_COMMENT_KEY}"]`,
+    );
+    if (!textarea) continue;
+    items.push({
+      kind: 'item',
+      text: typeof textarea.value === 'string' ? textarea.value.trim() : '',
+    });
+  }
+  return normaliseListItems(items);
 }
 
 function detectRestRoot() {

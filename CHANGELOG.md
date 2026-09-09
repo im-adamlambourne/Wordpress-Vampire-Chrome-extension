@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Snapshot and apply follow the WordPress `post_type`. `post` and `list` keep today's fields (headline, body, standfirst/Description, Open Graph, SEO, focus keyphrase). `sxs-recipe` also reads and writes **Method Steps** (Good Food ACF flexible `field_sxs-method-recipe-flex`, heading and step layouts). Method-step rewrites apply immediately, like body. Overlay action buttons are unchanged.
+- Snapshot and apply follow the WordPress `post_type`. `post` keeps today's fields (headline, body, standfirst/Description, Open Graph, SEO, focus keyphrase). `sxs-recipe` also reads and writes **Method Steps** (Good Food ACF flexible `field_sxs-method-recipe-flex`). `list` also reads and writes **list item editorial comments** (Radio Times ACF flexible `field_acf_bs_show_listmeta-list_items`, `broadcast_shows_content` comments only). Method-step rewrites apply immediately, like body. Overlay action buttons are unchanged.
+
+### Changed
+
+- On `sxs-recipe`, **Internal links** apply to Method Steps. Accept wraps the first unlinked occurrence in a step instruction (not a heading, not Classic `#content`) and writes `method_steps`.
+- On `list`, **Internal links** apply to list item editorial comments (not the "RT says:" heading, not the show picker, not Classic `#content`). Accept wraps the first unlinked occurrence and writes `list_items`.
 
 ### Fixed
 
+- Accepting an **Internal links** card on a recipe now updates the Method Steps on screen. Apply was writing the hidden textarea and reporting success while TinyMCE still showed the old step; it now writes the visual editor in place (and does the same for list item comments).
 - Accepting a suggestion card no longer fails with "Could not update the editor". The MAIN-world bridge called `normaliseMethodSteps` on every apply, but that helper lived in a separate content-script file whose functions are not in scope there. Helpers now install on `globalThis`, and apply still writes title/excerpt/SEO if they are missing.
+- Recipe **Internal links** Accept now writes Method Steps when the MAIN-world allow-list helpers are missing. Snapshot and apply treated that as "not a recipe" (`method_steps: []`), so cards could still wrap the isolated DOM fallback while the bridge skipped the TinyMCE write. The bridge now falls back to `sxs-recipe` / `list` locally, and still reads/writes when the ACF flex field is on the page.
 
 ## [0.8.0] - 2026-09-09
 
