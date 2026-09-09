@@ -129,6 +129,10 @@ const FIELD_ICONS = {
   og_description: 'search',
   focus_keyphrase: 'search',
 };
+const REGENERATING_NOTE = 'Regenerating…';
+const REGENERATED_NOTE = 'Regenerated';
+const REGENERATE_FAILED_NOTE = 'Nothing new came back. Try again.';
+const EMPTY_REPLY_TEXT = 'The assistant replied with nothing to show. Try again.';
 const REGENERATE_PROMPTS = {
   title: 'Write a different headline for this draft. Do not change the draft yet.',
   excerpt: 'Write a different standfirst for this draft. Do not change the post title or body.',
@@ -2125,7 +2129,9 @@ function suggestionCard(suggestion, handlers, group = null) {
       children.push(el('p', { className: 'wpv-chat__card-value', text: suggestion.value }));
     }
 
-    if (suggestion.note) {
+    if (suggestion.regenerating) {
+      children.push(cardStateLine(REGENERATING_NOTE));
+    } else if (suggestion.note) {
       children.push(cardStateLine(suggestion.note, { tone: suggestion.noteError ? 'error' : '' }));
     }
 
@@ -2483,6 +2489,14 @@ function bindComposer(root, initialAuth = {}) {
       const prompt = REGENERATE_PROMPTS[suggestion.field];
       if (!prompt || state.busy) return;
 
+      // The request is quiet — no bubble either way — so the card itself has to
+      // carry the feedback, or a regenerate looks like nothing happened.
+      suggestion.regenerating = true;
+      suggestion.note = '';
+      suggestion.noteError = false;
+      view.render();
+
+      let swapped = false;
       await sendUserMessage(prompt, {
         actionId: state.activeAction,
         quiet: true,
@@ -2491,12 +2505,24 @@ function bindComposer(root, initialAuth = {}) {
           if (!replacement || !nonEmptyString(replacement.value)) return false;
           suggestion.value = replacement.value;
           suggestion.status = 'pending';
-          suggestion.note = '';
+          suggestion.regenerating = false;
+          suggestion.note = REGENERATED_NOTE;
           suggestion.noteError = false;
+          swapped = true;
           view.render();
           return true;
         },
       });
+
+      // The reply did not carry this field — it answered in prose, answered
+      // about something else, failed, or never arrived. Whatever it was, the
+      // card must not sit there unchanged and unexplained.
+      if (!swapped) {
+        suggestion.regenerating = false;
+        suggestion.note = REGENERATE_FAILED_NOTE;
+        suggestion.noteError = true;
+        view.render();
+      }
     },
   };
 
@@ -2518,6 +2544,7 @@ function bindComposer(root, initialAuth = {}) {
       input.value = '';
       input.removeAttribute('aria-invalid');
     }
+    const history = transcript.slice(-MAX_HISTORY);
     transcript.push({ role: 'user', content: message });
     if (!quiet) {
       appendMessage(messages, scroller, {
@@ -2539,7 +2566,7 @@ function bindComposer(root, initialAuth = {}) {
       const accepted = await chrome.runtime.sendMessage({
         type: 'PLUGIN_CHAT',
         message,
-        history: transcript.slice(-MAX_HISTORY),
+        history,
         article: compactArticle(article),
         ...(state.activeAction ? { action: state.activeAction } : {}),
       });
@@ -2602,12 +2629,21 @@ function bindComposer(root, initialAuth = {}) {
         statusError = applied.statusError;
       }
 
-      appendMessage(messages, scroller, {
-        role: 'assistant',
-        text: replyText,
-        status,
-        statusError,
-      });
+      // An empty reply used to append an empty bubble, which looks identical
+      // to the assistant never answering. Say something instead — unless the
+      // cards or the applied status are themselves the answer.
+      const bubbleText = nonEmptyString(replyText)
+        ? replyText
+        : (hasCards || status ? '' : EMPTY_REPLY_TEXT);
+      if (nonEmptyString(bubbleText) || status) {
+        appendMessage(messages, scroller, {
+          role: 'assistant',
+          text: bubbleText,
+          status,
+          statusError,
+          error: bubbleText === EMPTY_REPLY_TEXT,
+        });
+      }
       if (hasCards) {
         renderSuggestions(messages, model, suggestionHandlers);
         scroller.scrollToBottom();
