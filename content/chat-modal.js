@@ -977,6 +977,13 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   color: var(--text-muted);
 }
 
+.wpv-chat__card-state .wpv-chat__spinner {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: rgb(58, 181, 244);
+}
+
 .wpv-chat__card-state--added {
   color: #4ade80;
 }
@@ -2120,10 +2127,12 @@ function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   }, children);
 }
 
-function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null } = {}) {
+function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null, busy = false } = {}) {
   const line = el('p', {
     className: tone ? `wpv-chat__card-state wpv-chat__card-state--${tone}` : 'wpv-chat__card-state',
+    ...(busy ? { 'aria-busy': 'true', role: 'status' } : {}),
   });
+  if (busy) line.appendChild(sendSpinner());
   if (tone === 'added') line.appendChild(strokeIcon('check', 'wpv-chat__card-button-icon'));
   line.appendChild(el('span', { text }));
   if (undoLabel && onUndo) {
@@ -2168,7 +2177,7 @@ function suggestionCard(suggestion, handlers, group = null) {
     }
 
     if (suggestion.regenerating) {
-      children.push(cardStateLine(REGENERATING_NOTE));
+      children.push(cardStateLine(REGENERATING_NOTE, { busy: true }));
     } else if (suggestion.note) {
       children.push(cardStateLine(suggestion.note, { tone: suggestion.noteError ? 'error' : '' }));
     }

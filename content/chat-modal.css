@@ -818,6 +818,13 @@
   color: var(--text-muted);
 }
 
+.wpv-chat__card-state .wpv-chat__spinner {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: rgb(58, 181, 244);
+}
+
 .wpv-chat__card-state--added {
   color: #4ade80;
 }

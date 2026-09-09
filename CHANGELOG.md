@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A regenerating suggestion card shows the overlay spinner next to *Regenerating…*.
 - Settings **Server host** is a dropdown of Production, Develop, and Local (`localhost`) instead of a typed URL.
 - Overlay is named **Content Studio Assistant** (was Revision Assistant), and the welcome copy points at the action buttons.
 - SEO, Open Graph, excerpt, focus keyphrase and headline replies are no longer written straight into the draft — they wait on a card until accepted. Body and selection rewrites still apply as soon as the reply lands.
