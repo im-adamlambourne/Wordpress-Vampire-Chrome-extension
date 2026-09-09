@@ -7,7 +7,12 @@ const refreshBtn = document.getElementById('refresh');
 const cexAuthEl = document.getElementById('cex-auth');
 const cexStatusEl = document.getElementById('cex-status');
 const hostForm = document.getElementById('cex-host-form');
-const hostInput = document.getElementById('cex-host');
+const hostSelect = document.getElementById('cex-host');
+const LOOPBACK_HOST_ALIASES = {
+  'http://127.0.0.1': 'http://localhost',
+  'http://127.0.0.1:8080': 'http://localhost',
+  'http://localhost:8080': 'http://localhost',
+};
 const loginBtn = document.getElementById('cex-login');
 const accountNameEl = document.getElementById('account-name');
 const accountBtn = document.getElementById('account-button');
@@ -76,35 +81,20 @@ function enableLightDismiss(dialog) {
   });
 }
 
-function syncHostValidity(input) {
-  try {
-    if (input.value.trim()) {
-      assertAllowedApiHost(normalizeApiHost(input.value));
-    }
-    input.setCustomValidity('');
-  } catch (err) {
-    input.setCustomValidity(err.message);
-  }
+function hostSelectHasValue(value) {
+  return [...hostSelect.options].some((option) => option.value === value);
 }
 
-function syncHostAria(event) {
-  const input = event.target;
-  if (input !== hostInput || !input.matches) return;
-  syncHostValidity(input);
-  if (input.matches(':user-invalid')) {
-    input.setAttribute('aria-invalid', 'true');
-  } else {
-    input.removeAttribute('aria-invalid');
+function setHostSelectValue(host) {
+  const value = LOOPBACK_HOST_ALIASES[host] || host;
+  if (!hostSelectHasValue(value) && ALLOWED_API_ORIGINS.includes(value)) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    hostSelect.append(option);
   }
+  hostSelect.value = hostSelectHasValue(value) ? value : DEFAULT_API_HOST;
 }
-
-hostInput.addEventListener('blur', syncHostAria, true);
-hostInput.addEventListener('focus', syncHostAria, true);
-hostInput.addEventListener('input', (event) => {
-  if (hostInput.getAttribute('aria-invalid') === 'true') {
-    syncHostAria(event);
-  }
-});
 
 async function grantAndSaveHost(host) {
   assertAllowedApiHost(host);
@@ -124,7 +114,7 @@ async function grantAndSaveHost(host) {
   }
 
   await chrome.storage.local.set({ apiHost: host });
-  hostInput.value = host;
+  setHostSelectValue(host);
   return { granted: true, previousHost };
 }
 
@@ -134,7 +124,7 @@ async function loadCexAuth() {
     'apiToken',
     'apiUserName',
   ]);
-  hostInput.value = apiHost;
+  setHostSelectValue(apiHost);
 
   syncAccountHeader(Boolean(apiToken), apiUserName || '');
 
@@ -187,11 +177,9 @@ hostForm.addEventListener('submit', async (event) => {
 
   let host;
   try {
-    host = assertAllowedApiHost(normalizeApiHost(hostInput.value));
-    hostInput.setCustomValidity('');
+    host = assertAllowedApiHost(hostSelect.value);
   } catch (err) {
-    hostInput.setCustomValidity(err.message);
-    hostInput.reportValidity();
+    setCexStatus('error', err.message);
     return;
   }
 
@@ -217,7 +205,7 @@ hostForm.addEventListener('submit', async (event) => {
 loginBtn.addEventListener('click', async () => {
   let host;
   try {
-    host = assertAllowedApiHost(normalizeApiHost(hostInput.value || DEFAULT_API_HOST));
+    host = assertAllowedApiHost(hostSelect.value || DEFAULT_API_HOST);
   } catch (err) {
     setCexStatus('error', err.message);
     return;

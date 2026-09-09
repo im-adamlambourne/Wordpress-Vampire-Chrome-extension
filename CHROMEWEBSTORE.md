@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Content Studio
 
-> Last Updated: 2026-08-26
+> Last Updated: 2026-09-09
 
 Private Immediate Media listing. Not searchable on the public Chrome Web Store.
 Copy the fields below into the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
@@ -53,7 +53,7 @@ FEATURES
 • Draft checklist flags missing or over-long title, excerpt, SEO, Open Graph, keyphrase, and a thin body. Click a gap to send a targeted prompt.
 • Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
 • If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
-• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; change it in Settings → Show advanced settings. A notification confirms a successful login.
+• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; choose another from the Server host list in Settings → Show advanced settings. A notification confirms a successful login.
 • The signed-in toolbar popup shows the Workspace feature buttons enabled for your assigned site (the same glyphs as the Content Studio Workspace dashboard). Click a button to open that feature in a new tab.
 • Chat replies arrive in the overlay after you send a message; you do not wait on a frozen page while the assistant works.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
@@ -61,7 +61,7 @@ FEATURES
 HOW TO USE
 1. Install this listing while signed into Chrome with your Immediate Media Google account (or an account on the allowed tester list / Google Group).
 2. Pin Content Studio and open the toolbar popup.
-3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, save the server, and allow access.
+3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, pick a Server host, save, and allow access.
 4. Sign in to Content Studio, and Connect.
 5. Open a post or page in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Content Studio Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
 6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
@@ -212,7 +212,7 @@ How to install
 Load the uploaded package. Pin the toolbar icon.
 
 How to configure
-1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings to change it).
+1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings → Server host to change it).
 2. Click Log in and allow the origin (and a second realtime origin if Chrome asks: `ws.` plus the hostname, or local port 8081) when Chrome prompts.
 3. Sign in → Connect.
 4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.

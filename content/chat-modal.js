@@ -2066,6 +2066,44 @@ function parseLinkSuggestionsFromReply(reply, articleContent) {
   };
 }
 
+/**
+ * Headline regenerate (and a first Headline click whose `title_variants` were
+ * empty) often answers with a numbered list in `reply`. Read those lines into
+ * title cards so Accept / Regenerate have a value to swap. Structured
+ * `title_variants` already become cards in `normaliseReply()`; this is only
+ * the prose fallback.
+ */
+function parseHeadlineVariantsFromReply(reply) {
+  const lines = String(reply || '').split('\n');
+  const suggestions = [];
+  const kept = [];
+
+  lines.forEach((line, index) => {
+    const bullet = line.match(/^\s*(?:[-*\u2022\u00b7\u2013\u2014]|\d+[.)])\s+(.+)$/);
+    const title = bullet ? bullet[1].trim().replace(/^["\u201c]|["\u201d]$/g, '') : '';
+    if (!bullet || title.length < 8 || /^(let me know|would you like|if you want)\b/i.test(title)) {
+      kept.push(line);
+      return;
+    }
+
+    suggestions.push({
+      id: `parsed-title-${index}`,
+      kind: 'field',
+      field: 'title',
+      label: FIELD_LABELS.title,
+      value: title,
+      status: 'pending',
+      note: '',
+      noteError: false,
+    });
+  });
+
+  return {
+    suggestions: suggestions.slice(0, 8),
+    reply: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
 function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   const children = [];
   if (icon) children.push(strokeIcon(icon, 'wpv-chat__card-button-icon'));
@@ -2604,6 +2642,22 @@ function bindComposer(root, initialAuth = {}) {
         if (parsed.suggestions.length > 0) {
           model.suggestions = parsed.suggestions;
           replyText = parsed.reply || 'Here are internal links that could fit this draft.';
+        }
+      }
+
+      // Headline regenerate often answers with a numbered list in `reply` and
+      // an empty `title_variants` array. Pull those lines into title cards so
+      // quiet absorb has a field to swap. Skip when structured variants
+      // already produced a title card.
+      if (
+        state.activeAction === 'headline'
+        && !model.suggestions.some((item) => item.field === 'title')
+      ) {
+        const parsed = parseHeadlineVariantsFromReply(replyText);
+        if (parsed.suggestions.length > 0) {
+          model.suggestions.push(...parsed.suggestions);
+          numberRepeatedLabels(model.suggestions);
+          replyText = parsed.reply || 'Here are some headline options.';
         }
       }
 

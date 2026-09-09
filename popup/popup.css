@@ -288,43 +288,6 @@ main {
   color: var(--color-muted);
 }
 
-.hint {
-  display: block;
-  color: var(--color-muted);
-  font-size: 12px;
-  margin-bottom: 0.25rem;
-}
-
-#cex-host {
-  width: 100%;
-  min-height: 36px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-panel);
-  color: var(--color-text);
-  font: inherit;
-}
-
-#cex-host:focus-visible {
-  outline: 2px solid var(--color-sky);
-  outline-offset: 2px;
-}
-
-#cex-host:user-invalid {
-  border-color: var(--color-error);
-}
-
-.error-msg {
-  display: none;
-  color: var(--color-error);
-  font-size: 12px;
-}
-
-#cex-host:user-invalid ~ .error-msg {
-  display: block;
-}
-
 #workspace-site-section {
   margin: 0 0 16px;
 }
@@ -349,17 +312,48 @@ main {
   color: var(--color-muted);
 }
 
+#cex-host,
 #workspace-site-select {
   width: 100%;
   min-height: 36px;
-  padding: 8px 10px;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  appearance: base-select;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+#cex-host::picker(select),
+#workspace-site-select::picker(select) {
+  appearance: base-select;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-panel);
   color: var(--color-text);
-  font: inherit;
 }
 
+#cex-host::picker-icon,
+#workspace-site-select::picker-icon {
+  color: var(--color-sky);
+}
+
+#cex-host option,
+#workspace-site-select option {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+}
+
+#cex-host option:hover,
+#workspace-site-select option:hover {
+  background: var(--color-status-bg);
+}
+
+#cex-host:focus-visible,
 #workspace-site-select:focus-visible {
   outline: 2px solid var(--color-sky);
   outline-offset: 2px;

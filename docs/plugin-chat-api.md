@@ -220,9 +220,16 @@ for example *"Write a different SEO title of 60 characters or fewer. Do not chan
 title, body or excerpt."* The extension takes the first suggestion matching that field and
 swaps the value in place. Returning the full set again is fine — the others are ignored.
 
-**A regenerate reply must carry the field**, in `suggestions` or `edits`. Answering in prose
-("Sure — how about …?") leaves the card unchanged, because there is nothing to put in it; the
-card then says *Nothing new came back* and the prose is shown as an ordinary reply bubble.
+**A regenerate reply must carry the field**, in `suggestions`, `edits`, or
+`title_variants`. Answering in prose ("Sure — how about …?") leaves the card
+unchanged, because there is nothing to put in it; the card then says *Nothing
+new came back* and the prose is shown as an ordinary reply bubble.
+
+**Headline** is the exception that used to look like that failure: the model
+often lists alternatives as a numbered list in `reply` and leaves
+`title_variants` empty. Content Studio scrapes those lines into `title_variants`,
+and the overlay does the same if they still arrive as prose, so **Regenerate**
+on a headline card can swap a value.
 
 `history` holds the turns *before* the message it is sent with — `message` is not repeated
 in it.
