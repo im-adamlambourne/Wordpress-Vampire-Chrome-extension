@@ -142,6 +142,7 @@ async function deliverPluginChatResult(tabId, message, requestId) {
     outbound.reply = typeof message.reply === 'string' ? message.reply : '';
     outbound.edits = normaliseEdits(message.edits);
     outbound.title_variants = normaliseTitleVariants(message.title_variants);
+    outbound.suggestions = normaliseSuggestions(message.suggestions);
   } else {
     outbound.error = message.error || 'The assistant could not complete that request.';
   }

@@ -8,9 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Overlay action buttons for **Internal links**, **Headline**, **Standfirst** and **SEO metadata**. **First sub** and **Footers** are shown with a SOON pill and are not usable yet.
+- Replies come back as reviewable suggestion cards. **Accept** writes only that field into the draft, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** / **Reconsider** put it back. A headline reply becomes one card per alternative rather than a pick-one list, so every suggestion carries the same three buttons. A field holds one value, so accepting a second headline returns the first card to pending and leaves **Undo** pointing at the headline the draft had before any of them. A regenerate is deliberately quiet — no bubble either way — so the card reports it: *Regenerating…* while the request is out, *Regenerated* when the new value lands, and *Nothing new came back* when the reply did not carry that field.
+- Editor bridge accepts an opt-in `clear` list (title, excerpt, SEO, Open Graph, focus keyphrase) so **Undo** can restore a field that was blank before the suggestion was accepted. Body and selection are never cleared.
+- Beta badge in the overlay header, behind `SHOW_BETA_BADGE` in `content/chat-modal.js`.
+- Chat requests carry the `action` id of the overlay button that produced the prompt (`internal_links`, `headline`, `standfirst`, `seo`, and the reserved `first_sub`, `footers`, `images`), so Content Studio no longer has to infer intent from prompt wording. Omitted for free text.
+- `docs/plugin-chat-api.md` specifies the chat request and reply contract for the Content Studio side, including the `suggestions` array, per-action expectations, limits and a rollout order.
+
 ### Changed
 
+- Overlay is named **Content Studio Assistant** (was Revision Assistant), and the welcome copy points at the action buttons.
+- SEO, Open Graph, excerpt, focus keyphrase and headline replies are no longer written straight into the draft — they wait on a card until accepted. Body and selection rewrites still apply as soon as the reply lands.
+- Internal links keeps its existing behaviour (reply plus the body edit) until `POST /api/plugin/chat` returns a `suggestions` array. Once it does, the overlay renders link cards and inserts the anchor itself.
+- The panel sizes to its content instead of always being 40rem tall.
 - Realtime connection failures show “Could not connect to Content Studio. Please try again later.” instead of asking the user to start Reverb.
+
+### Removed
+
+- Free-text composer is hidden for the beta behind `SHOW_FREE_CHAT`. The send path, prompt history and `PLUGIN_CHAT` wiring are unchanged, so the flag brings it back.
+- Draft checklist is hidden behind `SHOW_DRAFT_CHECKLIST`. The Images action and the greeting’s **I can also** list are gone from the overlay; the related-images prompt stays in the source.
+
+### Fixed
+
+- Chat requests no longer hand the agent the same instruction twice. `history` was sliced from the transcript *after* the new prompt had been pushed onto it, so every request carried the prompt both as the last history turn and as `message`. Single-field prompts suffer most — a repeated instruction invites an acknowledgement instead of an answer, which is why **Regenerate** so often came back with nothing usable. `history` is now the turns before this one, which is what `docs/plugin-chat-api.md` already described.
+- An empty reply no longer renders an empty bubble. `reply` is normalised to `''` when the assistant sends none, and the overlay appended it regardless, so "answered with nothing" looked exactly like "never answered". A reply with nothing to show now says so, and the bubble is skipped altogether when the cards or the applied-edit status are the answer.
+- **Internal links** produces cards again. The action's prompt asks the agent not to touch the body, so it answers with a bullet list instead of a body rewrite — and Content Studio does not send `suggestions` yet, which left the reply as unusable prose. Those bullets are now read into link cards (`parseLinkSuggestionsFromReply`), preferring the anchor alternative that actually appears in the draft, and the bullet list is stripped from the reply bubble. This is interim: `normaliseReply()` still prefers a real `suggestions` array, and the parser can be deleted once the API sends one.
+- Standfirst, SEO metadata and focus keyphrase now reach Immediate WCP article fields. ACF semantics were matched by exact field name or exact label only, so `im-wp-core-description` (labelled "Description") matched neither and the standfirst was written to the hidden native excerpt box instead of the visible **Description** field — reporting success while nothing changed on screen. The snapshot could not read it either, so the assistant never saw the existing standfirst. `im_seo-main-keyword-phrase` was unmatched for the same reason. Matching is now three passes over a most-specific-first order (exact name, then label, then trailing name segment), which also keeps the three rival "Description" fields — standfirst, Open Graph and SEO meta — from claiming each other.
+- Chat requests no longer carry a stale `action` id. `state.activeAction` was only ever set, never cleared, so a free-text message or a draft-checklist prompt reported whichever action button ran last. Both surfaces are behind flags today, but the id is exactly what Content Studio is meant to branch on. Regenerate now passes the action explicitly.
+- Accepting an internal link no longer targets headings, captions, pull quotes or code blocks. The first match in the document was winning even when it was an `<h2>`, which is not where a link belongs; an anchor found only in those places is refused instead.
+- Realtime replies now carry `suggestions` through to the overlay. The offscreen Echo client and `deliverPluginChatResult` both rebuild the payload from a fixed key list, so the array was dropped twice before reaching the page and the suggestion-card contract could never have worked. Entries are sanitised in the service worker (unknown kinds, unknown fields and unknown keys are stripped, capped at 20) so the WordPress page only sees what the overlay can render.
 
 ## [0.7.1] - 2026-08-26
 

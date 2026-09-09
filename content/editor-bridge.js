@@ -213,8 +213,26 @@ const ACF_ALIASES = {
     'focuskw',
     'keyphrase',
     'keyword',
+    'keyword_phrase',
+    'main_keyword_phrase',
   ],
 };
+
+/**
+ * Most specific semantic first. A WCP article has three fields labelled
+ * "Description" — the standfirst, Open Graph and SEO meta — so the generic
+ * excerpt match has to be tried only after the qualified ones have had a go.
+ */
+const ACF_MATCH_ORDER = [
+  'focus_keyphrase',
+  'seo_title',
+  'seo_description',
+  'og_title',
+  'og_description',
+  'title',
+  'excerpt',
+  'content',
+];
 const ACF_LABEL_ALIASES = {
   title: ['short headline', 'short title', 'display title', 'override title'],
   excerpt: [
@@ -227,6 +245,7 @@ const ACF_LABEL_ALIASES = {
     'strapline',
     'kicker',
     'sell',
+    'description',
   ],
   content: ['article body', 'main content', 'post content'],
   seo_title: ['seo title', 'meta title'],
@@ -238,7 +257,7 @@ const ACF_LABEL_ALIASES = {
     'facebook description',
     'social description',
   ],
-  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase'],
+  focus_keyphrase: ['focus keyphrase', 'focus keyword', 'keyphrase', 'keyword phrase', 'main keyword phrase'],
 };
 const ACF_GENERIC_DATA_KEYS = new Set([
   'description',
@@ -543,7 +562,17 @@ function normaliseEdits(raw) {
       edits[field.key] = raw[field.key].trim().slice(0, field.max);
     }
   }
+  for (const key of clearableKeys(raw.clear)) {
+    if (!(key in edits)) edits[key] = '';
+  }
   return edits;
+}
+
+/** Keys the overlay may blank on undo. Body and selection are never cleared. */
+function clearableKeys(raw) {
+  if (!Array.isArray(raw)) return [];
+  const allowed = ['title', 'excerpt', ...SEO_FIELDS.map((field) => field.key)];
+  return raw.filter((key) => typeof key === 'string' && allowed.includes(key));
 }
 
 function stripScripts(html) {
@@ -555,8 +584,8 @@ function applyGutenberg(edits) {
   const editorDispatch = window.wp.data.dispatch('core/editor');
   const meta = {};
 
-  if (edits.title) meta.title = edits.title;
-  if (edits.excerpt) meta.excerpt = edits.excerpt;
+  if ('title' in edits) meta.title = edits.title;
+  if ('excerpt' in edits) meta.excerpt = edits.excerpt;
 
   if (edits.selection) {
     applied.push(...applyGutenbergSelection(edits));
@@ -580,8 +609,8 @@ function applyGutenberg(edits) {
   if (Object.keys(meta).length > 0) {
     try {
       editorDispatch.editPost(meta);
-      if (meta.title) applied.push('title');
-      if (meta.excerpt) applied.push('excerpt');
+      if ('title' in meta) applied.push('title');
+      if ('excerpt' in meta) applied.push('excerpt');
     } catch (err) {
       if (applied.length === 0) throw err;
     }
@@ -652,14 +681,14 @@ function applyGutenbergSelection(edits) {
 function applyClassic(edits) {
   const applied = [];
 
-  if (edits.title) {
+  if ('title' in edits) {
     const title = document.getElementById('title');
     if (!title) throw new Error('Could not find the title field.');
     setFieldValue(title, edits.title);
     applied.push('title');
   }
 
-  if (edits.excerpt) {
+  if ('excerpt' in edits) {
     const excerpt = document.getElementById('excerpt');
     if (excerpt) {
       setFieldValue(excerpt, edits.excerpt);
@@ -771,7 +800,7 @@ function readSeoSnapshot() {
 function applySeoFields(edits) {
   const applied = [];
   for (const field of SEO_FIELDS) {
-    if (!edits[field.key]) continue;
+    if (!(field.key in edits)) continue;
     if (writeSeoField(field, edits[field.key])) applied.push(field.key);
   }
   return applied;
@@ -954,7 +983,7 @@ function applyAcfFields(edits, alreadyApplied) {
   const applied = [];
   const fields = listAcfFields();
   for (const key of ACF_SEMANTIC_KEYS) {
-    if (!edits[key]) continue;
+    if (!(key in edits)) continue;
     if (!writeAcfSemantic(fields, key, edits[key])) continue;
     if (!alreadyApplied.includes(key) && !applied.includes(key)) applied.push(key);
   }
@@ -1066,14 +1095,29 @@ function normaliseAcfToken(value) {
     .replace(/^_|_$/g, '');
 }
 
+/**
+ * Three passes, each across every semantic in ACF_MATCH_ORDER, so a precise
+ * signal always beats a loose one: an exact field name beats a label, and a
+ * label beats a trailing name segment. Without that, "opengraph_description"
+ * would be claimed by the excerpt label alias before its own name matched.
+ */
 function semanticForAcfField(field) {
   const name = normaliseAcfToken(field.name);
   const label = String(field.label || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  for (const semantic of [...ACF_SEMANTIC_KEYS, 'content']) {
+
+  for (const semantic of ACF_MATCH_ORDER) {
     if ((ACF_ALIASES[semantic] || []).includes(name)) return semantic;
+  }
+  for (const semantic of ACF_MATCH_ORDER) {
     if ((ACF_LABEL_ALIASES[semantic] || []).some((alias) => label === alias || label.startsWith(`${alias} `))) {
       return semantic;
     }
+  }
+  // Prefixed names such as "im-wp-core-description" carry the alias last. The
+  // label falls back to the raw name when ACF renders no <label>, so this is
+  // the only signal left on those fields.
+  for (const semantic of ACF_MATCH_ORDER) {
+    if ((ACF_ALIASES[semantic] || []).some((alias) => name.endsWith(`_${alias}`))) return semantic;
   }
   return '';
 }
@@ -1321,7 +1365,7 @@ function applyAcfBlocks(edits) {
     let changed = false;
 
     for (const semantic of ACF_SEMANTIC_KEYS) {
-      if (!edits[semantic]) continue;
+      if (!(semantic in edits)) continue;
       const slugMatches = (ACF_ALIASES[semantic] || []).includes(slug);
       const key = pickAcfDataKey(data, semantic, { allowGeneric: slugMatches });
       if (!key) continue;
