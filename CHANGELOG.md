@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The overlay action buttons sit in a two-column grid so long labels no longer leave a ragged last row.
 - The signed-in toolbar popup no longer shows the Workspace feature grid. Sign-in, the header account control, and Settings stay; the catalog fetch, grid, and Settings site picker remain behind `SHOW_WORKSPACE_GRID` in `popup/popup.js`.
 - A regenerating suggestion card shows the overlay spinner next to *Regenerating…*.
 - Settings **Server host** is a dropdown of Production, Develop, and Local (`localhost`) instead of a typed URL.

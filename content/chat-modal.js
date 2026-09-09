@@ -753,18 +753,19 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .wpv-chat__action {
-  flex-shrink: 0;
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.7rem;
+  column-gap: 0.35rem;
+  min-inline-size: 0;
+  padding-block: 0.5rem;
+  padding-inline: 0.6rem;
   border: 1px solid var(--ws-hairline);
   border-radius: 0.45rem;
   background: var(--ws-well-4);
@@ -772,6 +773,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
+  text-align: start;
   cursor: pointer;
   user-select: none;
   transition:
@@ -829,6 +831,10 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__action-label {
+  min-inline-size: 0;
+  text-wrap: nowrap;
+  overflow: clip;
+  text-overflow: ellipsis;
   text-box: trim-both cap alphabetic;
 }
 
