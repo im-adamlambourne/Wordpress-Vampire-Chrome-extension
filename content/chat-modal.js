@@ -1535,6 +1535,7 @@ function fallbackArticleSnapshot() {
     post_id: '',
     post_type: '',
     url: location.href,
+    method_steps: [],
   };
 }
 
@@ -1579,6 +1580,10 @@ async function articleSnapshot() {
       focus_keyphrase: result.snapshot.focus_keyphrase || fallback.focus_keyphrase,
       selection: result.snapshot.selection || fallback.selection,
       editor_type: result.snapshot.editor_type || fallback.editor_type,
+      post_type: result.snapshot.post_type || fallback.post_type,
+      method_steps: Array.isArray(result.snapshot.method_steps)
+        ? result.snapshot.method_steps
+        : fallback.method_steps,
     };
   } catch {
     return fallback;
@@ -1594,6 +1599,11 @@ function compactArticle(article) {
     const text = String(next.selection.text || '').trim();
     if (!html && !text) delete next.selection;
     else next.selection = { html, text };
+  }
+  if (fieldsForPostType(next.post_type).includes('method_steps')) {
+    next.method_steps = normaliseMethodSteps(next.method_steps);
+  } else {
+    delete next.method_steps;
   }
   return next;
 }
@@ -1672,6 +1682,7 @@ function checklistItems(article) {
 
 function hasEdits(edits) {
   if (!edits || typeof edits !== 'object') return false;
+  if (Array.isArray(edits.method_steps) && edits.method_steps.length > 0) return true;
   return EDIT_KEYS.some((key) => (
     typeof edits[key] === 'string' && edits[key].trim() !== ''
   ));
@@ -1688,6 +1699,7 @@ function describeApplied(applied) {
     og_title: 'Open Graph title',
     og_description: 'Open Graph description',
     focus_keyphrase: 'focus keyphrase',
+    method_steps: 'method steps',
   };
   const parts = (Array.isArray(applied) ? applied : [])
     .map((key) => labels[key])
@@ -1765,7 +1777,19 @@ async function inferAppliedFields(edits) {
   if (edits.content && contentLooksApplied(article.content, edits.content)) {
     applied.push('body');
   }
+  if (Array.isArray(edits.method_steps) && edits.method_steps.length > 0
+    && methodStepsLookApplied(article.method_steps, edits.method_steps)) {
+    applied.push('method_steps');
+  }
   return applied;
+}
+
+function methodStepsLookApplied(current, next) {
+  const a = normaliseMethodSteps(current);
+  const b = normaliseMethodSteps(next);
+  if (a.length === 0 || b.length === 0) return false;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => row.kind === b[index].kind && row.text === b[index].text);
 }
 
 function sameText(a, b) {
@@ -1978,6 +2002,8 @@ function normaliseReply(result) {
   for (const key of ['content', 'selection']) {
     if (nonEmptyString(edits[key])) direct[key] = edits[key];
   }
+  const methodSteps = normaliseMethodSteps(edits.method_steps);
+  if (methodSteps.length > 0) direct.method_steps = methodSteps;
 
   numberRepeatedLabels(suggestions);
   return { suggestions, direct };

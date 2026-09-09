@@ -220,16 +220,69 @@ function acfDomValue(el, type) {
 }
 
 function detectArticleSnapshot() {
-  return {
+  const postType = detectPostType();
+  const snapshot = {
     title: detectTitle(),
     content: detectContent(),
     excerpt: detectExcerpt(),
     ...detectSeoSnapshot(),
     editor_type: detectEditorType() || '',
     post_id: detectPostId(),
-    post_type: detectPostType(),
+    post_type: postType,
     url: location.href,
   };
+  if (postTypeAllowsMethodSteps(postType)) {
+    snapshot.method_steps = detectMethodSteps();
+  }
+  return snapshot;
+}
+
+const METHOD_FLEX_KEY = 'field_sxs-method-recipe-flex';
+const METHOD_STEP_KEY = 'field_sxs-method-recipe-step';
+const METHOD_HEADING_LAYOUT = 'sxs-method-recipe-heading';
+const METHOD_STEP_LAYOUT = 'sxs-method-recipe-step';
+
+function detectMethodSteps() {
+  const root = document.querySelector(`.acf-field[data-key="${METHOD_FLEX_KEY}"]`);
+  if (!root) return [];
+
+  const rows = [];
+  for (const layout of methodLayouts(root)) {
+    const kind = methodLayoutKind(layout);
+    if (!kind) continue;
+    const text = methodLayoutText(layout, kind);
+    rows.push({ kind, text });
+  }
+  return normaliseMethodSteps(rows);
+}
+
+function methodLayouts(root) {
+  return [...root.querySelectorAll('.values > .layout')].filter((el) => (
+    !el.classList.contains('acf-clone')
+    && el.getAttribute('data-id') !== 'acfcloneindex'
+  ));
+}
+
+function methodLayoutKind(layout) {
+  const name = String(layout.getAttribute('data-layout') || '');
+  if (name === METHOD_HEADING_LAYOUT) return 'heading';
+  if (name === METHOD_STEP_LAYOUT) return 'step';
+  return '';
+}
+
+function methodLayoutText(layout, kind) {
+  if (kind === 'step') {
+    const textarea = layout.querySelector(
+      `textarea[name*="[${METHOD_STEP_KEY}]"], textarea[name*="${METHOD_STEP_KEY}"]`,
+    );
+    if (textarea && typeof textarea.value === 'string') return textarea.value.trim();
+  }
+  const named = layout.querySelector(
+    'input[type="text"][name*="heading"], textarea[name*="heading"]',
+  );
+  if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
+  const input = layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+  return input && typeof input.value === 'string' ? input.value.trim() : '';
 }
 
 function detectRestRoot() {

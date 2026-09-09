@@ -9,6 +9,10 @@ const MAX_OG_TITLE_CHARS = 200;
 const MAX_OG_DESCRIPTION_CHARS = 500;
 const MAX_FOCUS_KEYPHRASE_CHARS = 200;
 const MAX_SELECTION_CHARS = 8000;
+const METHOD_FLEX_KEY = 'field_sxs-method-recipe-flex';
+const METHOD_STEP_KEY = 'field_sxs-method-recipe-step';
+const METHOD_HEADING_LAYOUT = 'sxs-method-recipe-heading';
+const METHOD_STEP_LAYOUT = 'sxs-method-recipe-step';
 
 const SEO_FIELDS = [
   {
@@ -392,11 +396,25 @@ function takeSnapshot(editorType) {
       editor_type: 'classic',
     };
 
-  return truncateSnapshot(fillEmptyFromAcf({
+  const postType = detectPostType();
+  const snapshot = truncateSnapshot(fillEmptyFromAcf({
     ...core,
     ...readSeoSnapshot(),
     selection: takeSelection(editorType),
   }));
+  snapshot.post_type = postType;
+  if (wpvPostTypeAllowsMethodSteps(postType)) {
+    snapshot.method_steps = readMethodSteps();
+  }
+  return snapshot;
+}
+
+function detectPostType() {
+  const fromInput = String(fieldValue('post_type') || '').trim();
+  if (fromInput) return fromInput;
+  const named = document.querySelector('input[name="post_type"]');
+  if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
+  return new URLSearchParams(location.search).get('post_type') || '';
 }
 
 function truncateSnapshot(snapshot) {
@@ -530,6 +548,13 @@ async function applyEdits(editorType, rawEdits) {
     : applyClassic(edits);
   applied.push(...applySeoFields(edits));
   applied.push(...applyAcfFields(edits, applied));
+  if (wpvPostTypeAllowsMethodSteps(detectPostType()) && Array.isArray(edits.method_steps)) {
+    try {
+      if (applyMethodSteps(edits.method_steps)) applied.push('method_steps');
+    } catch {
+      // ACF flexible writes vary by version; other fields may still have applied.
+    }
+  }
   return [...new Set(applied)];
 }
 
@@ -562,6 +587,8 @@ function normaliseEdits(raw) {
       edits[field.key] = raw[field.key].trim().slice(0, field.max);
     }
   }
+  const methodSteps = wpvNormaliseMethodSteps(raw.method_steps);
+  if (methodSteps.length > 0) edits.method_steps = methodSteps;
   for (const key of clearableKeys(raw.clear)) {
     if (!(key in edits)) edits[key] = '';
   }
@@ -956,6 +983,163 @@ async function waitForAcfFields(timeoutMs = 1200) {
     if (listAcfFields().length > 0) return;
     await sleep(50);
   }
+}
+
+function methodFlexRoot() {
+  return document.querySelector(`.acf-field[data-key="${METHOD_FLEX_KEY}"]`);
+}
+
+function methodLayouts() {
+  const root = methodFlexRoot();
+  if (!root) return [];
+  return [...root.querySelectorAll('.values > .layout')].filter((el) => (
+    !el.classList.contains('acf-clone')
+    && el.getAttribute('data-id') !== 'acfcloneindex'
+  ));
+}
+
+function methodLayoutKind(layout) {
+  const name = String(layout.getAttribute('data-layout') || '');
+  if (name === METHOD_HEADING_LAYOUT) return 'heading';
+  if (name === METHOD_STEP_LAYOUT) return 'step';
+  return '';
+}
+
+function methodLayoutWantedName(kind) {
+  return kind === 'heading' ? METHOD_HEADING_LAYOUT : METHOD_STEP_LAYOUT;
+}
+
+function methodLayoutText(layout, kind) {
+  if (kind === 'step') {
+    const textarea = layout.querySelector(
+      `textarea[name*="[${METHOD_STEP_KEY}]"], textarea[name*="${METHOD_STEP_KEY}"]`,
+    );
+    if (textarea && typeof textarea.value === 'string') return textarea.value.trim();
+  }
+  const named = layout.querySelector(
+    'input[type="text"][name*="heading"], textarea[name*="heading"]',
+  );
+  if (named && typeof named.value === 'string' && named.value.trim()) {
+    return named.value.trim();
+  }
+  const input = layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+  return input && typeof input.value === 'string' ? input.value.trim() : '';
+}
+
+function methodLayoutInput(layout, kind) {
+  if (kind === 'step') {
+    return layout.querySelector(
+      `textarea[name*="[${METHOD_STEP_KEY}]"], textarea[name*="${METHOD_STEP_KEY}"]`,
+    );
+  }
+  return layout.querySelector('input[type="text"][name*="heading"], textarea[name*="heading"]')
+    || layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+}
+
+function getMethodFlexField() {
+  if (typeof window.acf?.getField !== 'function') return null;
+  try {
+    return window.acf.getField(METHOD_FLEX_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function wpvPostTypeAllowsMethodSteps(postType) {
+  const fn = globalThis.postTypeAllowsMethodSteps;
+  return typeof fn === 'function' ? fn(postType) : false;
+}
+
+function wpvNormaliseMethodSteps(raw) {
+  const fn = globalThis.normaliseMethodSteps;
+  return typeof fn === 'function' ? fn(raw) : [];
+}
+
+function readMethodSteps() {
+  return wpvNormaliseMethodSteps(methodLayouts().map((layout) => {
+    const kind = methodLayoutKind(layout);
+    return kind ? { kind, text: methodLayoutText(layout, kind) } : null;
+  }).filter(Boolean));
+}
+
+function applyMethodSteps(rows) {
+  const wanted = wpvNormaliseMethodSteps(rows);
+  if (!methodFlexRoot() && !getMethodFlexField()) return false;
+
+  let index = 0;
+  const existing = methodLayouts();
+  for (; index < wanted.length && index < existing.length; index += 1) {
+    const layout = existing[index];
+    if (methodLayoutKind(layout) !== wanted[index].kind) break;
+    writeMethodLayout(layout, wanted[index]);
+  }
+
+  const leftover = methodLayouts();
+  for (let j = leftover.length - 1; j >= index; j -= 1) {
+    removeMethodLayout(leftover[j]);
+  }
+
+  for (let j = index; j < wanted.length; j += 1) {
+    const layout = addMethodLayout(wanted[j].kind);
+    if (layout) writeMethodLayout(layout, wanted[j]);
+  }
+
+  markAcfChanged();
+  return true;
+}
+
+function writeMethodLayout(layout, row) {
+  const input = methodLayoutInput(layout, row.kind);
+  if (input) setFieldValue(input, row.text);
+  try {
+    const instance = window.acf?.getField?.(window.jQuery?.(input).closest('.acf-field'));
+    if (instance && typeof instance.val === 'function') instance.val(row.text);
+  } catch {
+    // Sub-field val() varies by ACF version.
+  }
+}
+
+function addMethodLayout(kind) {
+  const field = getMethodFlexField();
+  const layoutName = methodLayoutWantedName(kind);
+  if (field && typeof field.add === 'function') {
+    try {
+      const added = field.add({ layout: layoutName });
+      const el = jqueryEl(added);
+      if (el instanceof Element) return el;
+    } catch {
+      // Fall through to the last real layout.
+    }
+  }
+  const layouts = methodLayouts();
+  return layouts[layouts.length - 1] || null;
+}
+
+function removeMethodLayout(layout) {
+  const field = getMethodFlexField();
+  if (field && typeof field.remove === 'function') {
+    try {
+      field.remove(window.jQuery?.(layout) || layout);
+      return;
+    } catch {
+      // Fall through to acf.remove / DOM.
+    }
+  }
+  if (typeof window.acf?.remove === 'function') {
+    try {
+      window.acf.remove({ layout: window.jQuery?.(layout) || layout });
+      return;
+    } catch {
+      // Fall through to DOM removal.
+    }
+  }
+  layout.remove();
+}
+
+function markAcfChanged() {
+  const input = document.getElementById('_acf_changed')
+    || document.querySelector('input[name="_acf_changed"]');
+  if (input) setFieldValue(input, '1');
 }
 
 function fillEmptyFromAcf(snapshot) {

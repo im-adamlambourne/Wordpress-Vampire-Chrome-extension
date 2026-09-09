@@ -1,4 +1,4 @@
-importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
+importScripts('../content/post-type-fields.js', 'pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
 
 function statusIconPath(connected) {
   const suffix = connected ? 'connected' : 'disconnected';

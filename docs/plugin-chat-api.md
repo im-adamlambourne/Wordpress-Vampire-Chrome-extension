@@ -13,6 +13,7 @@ extension side of everything below is already shipped — see
 | Field | Direction | State |
 | --- | --- | --- |
 | `message`, `history`, `article`, `telemetry` | request | Shipped, unchanged |
+| `article.method_steps` / `edits.method_steps` | both | **New.** Recipe (`sxs-recipe`) only. Applies immediately, like `content` |
 | `action` | request | **New.** Sent by the extension now; Laravel may ignore it safely |
 | `reply`, `edits`, `title_variants` | realtime reply | Shipped, unchanged |
 | `suggestions` | realtime reply | **New.** Extension parses and renders it; nothing sends it yet |
@@ -88,6 +89,7 @@ reply back to the right tab.
     "post_id": "1234",
     "post_type": "post",
     "url": "https://…/wp-admin/post.php?post=1234&action=edit"
+    // "method_steps": [{ "kind": "step", "text": "…" }]  // sxs-recipe only
   },
   "telemetry": {                          // omitted when nothing could be detected
     "extension_version": "0.8.0",
@@ -103,6 +105,10 @@ Notes:
   before the request leaves the page — they are an internal detail of applying the edit.
 - Empty `editor_type`, `focus_keyphrase` and `selection` are removed rather than sent
   blank, so treat "absent" and "empty" as the same thing.
+- On `post_type: "sxs-recipe"` the snapshot also sends `article.method_steps`, an array of
+  `{ "kind": "heading"|"step", "text": "…" }` rows from the ACF method flexible field
+  (max 30 rows, 2000 chars each). Omitted on every other post type. A method rewrite
+  comes back on `edits.method_steps` and applies immediately, like `content`.
 - The snapshot is best-effort DOM/`wp.data` reading. Any field can be an empty string.
 
 ### `action`
@@ -162,9 +168,9 @@ own card, the labels are numbered when they would otherwise read alike, and acce
 returns whichever card was accepted before it to pending. That is what a headline reply
 looks like, whether it arrives as `title_variants` or as repeated `field: "title"` entries.
 
-`content` and `selection` are **not** valid `field` values. A body or selection rewrite
-cannot be reviewed sentence by sentence, so those stay on `edits` and apply as soon as the
-reply lands.
+`content`, `selection`, and `method_steps` are **not** valid `field` values. A body,
+selection, or method rewrite cannot be reviewed sentence by sentence, so those stay on
+`edits` and apply as soon as the reply lands.
 
 ### `kind: "internal_link"`
 
@@ -195,7 +201,8 @@ The extension merges both into one list, with `suggestions` winning:
 1. Every valid `suggestions` entry becomes a card.
 2. `title_variants` becomes one card per alternative — unless a suggestion already covers `title`.
 3. Any `edits` key in the field list above that is **not** already covered becomes a card.
-4. `edits.content` and `edits.selection` are applied to the draft straight away.
+4. `edits.content`, `edits.selection`, and `edits.method_steps` are applied to the draft
+   straight away.
 
 So a reply that sends only `edits` still produces cards. Sending `suggestions` is about
 control — labels, ordering, multiple values, and link metadata — not about whether cards
@@ -252,6 +259,7 @@ nothing breaks if a value is longer — it is cut, not rejected.
 | `edits.title` | 500 chars |
 | `edits.excerpt` | 2000 chars |
 | `edits.content` | 20000 chars |
+| `edits.method_steps` | 30 rows, 2000 chars per `text`, ~20000 chars combined |
 | `edits.selection` | 8000 chars |
 | `seo_title`, `og_title`, `focus_keyphrase` | 200 chars |
 | `seo_description`, `og_description` | 500 chars |

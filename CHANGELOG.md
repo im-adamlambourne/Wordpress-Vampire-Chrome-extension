@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Snapshot and apply follow the WordPress `post_type`. `post` and `list` keep today's fields (headline, body, standfirst/Description, Open Graph, SEO, focus keyphrase). `sxs-recipe` also reads and writes **Method Steps** (Good Food ACF flexible `field_sxs-method-recipe-flex`, heading and step layouts). Method-step rewrites apply immediately, like body. Overlay action buttons are unchanged.
+
+### Fixed
+
+- Accepting a suggestion card no longer fails with "Could not update the editor". The MAIN-world bridge called `normaliseMethodSteps` on every apply, but that helper lived in a separate content-script file whose functions are not in scope there. Helpers now install on `globalThis`, and apply still writes title/excerpt/SEO if they are missing.
+
 ## [0.8.0] - 2026-09-09
 
 ### Added

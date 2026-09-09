@@ -226,6 +226,8 @@ function normaliseEdits(raw) {
       edits[key] = raw[key];
     }
   }
+  const methodSteps = normaliseMethodSteps(raw.method_steps);
+  if (methodSteps.length > 0) edits.method_steps = methodSteps;
   return edits;
 }
 
