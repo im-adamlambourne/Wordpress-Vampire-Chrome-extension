@@ -753,18 +753,19 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .wpv-chat__action {
-  flex-shrink: 0;
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.7rem;
+  column-gap: 0.35rem;
+  min-inline-size: 0;
+  padding-block: 0.5rem;
+  padding-inline: 0.6rem;
   border: 1px solid var(--ws-hairline);
   border-radius: 0.45rem;
   background: var(--ws-well-4);
@@ -772,6 +773,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
+  text-align: start;
   cursor: pointer;
   user-select: none;
   transition:
@@ -829,6 +831,10 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__action-label {
+  min-inline-size: 0;
+  text-wrap: nowrap;
+  overflow: clip;
+  text-overflow: ellipsis;
   text-box: trim-both cap alphabetic;
 }
 
@@ -975,6 +981,13 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.wpv-chat__card-state .wpv-chat__spinner {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: rgb(58, 181, 244);
 }
 
 .wpv-chat__card-state--added {
@@ -2066,6 +2079,44 @@ function parseLinkSuggestionsFromReply(reply, articleContent) {
   };
 }
 
+/**
+ * Headline regenerate (and a first Headline click whose `title_variants` were
+ * empty) often answers with a numbered list in `reply`. Read those lines into
+ * title cards so Accept / Regenerate have a value to swap. Structured
+ * `title_variants` already become cards in `normaliseReply()`; this is only
+ * the prose fallback.
+ */
+function parseHeadlineVariantsFromReply(reply) {
+  const lines = String(reply || '').split('\n');
+  const suggestions = [];
+  const kept = [];
+
+  lines.forEach((line, index) => {
+    const bullet = line.match(/^\s*(?:[-*\u2022\u00b7\u2013\u2014]|\d+[.)])\s+(.+)$/);
+    const title = bullet ? bullet[1].trim().replace(/^["\u201c]|["\u201d]$/g, '') : '';
+    if (!bullet || title.length < 8 || /^(let me know|would you like|if you want)\b/i.test(title)) {
+      kept.push(line);
+      return;
+    }
+
+    suggestions.push({
+      id: `parsed-title-${index}`,
+      kind: 'field',
+      field: 'title',
+      label: FIELD_LABELS.title,
+      value: title,
+      status: 'pending',
+      note: '',
+      noteError: false,
+    });
+  });
+
+  return {
+    suggestions: suggestions.slice(0, 8),
+    reply: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
 function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   const children = [];
   if (icon) children.push(strokeIcon(icon, 'wpv-chat__card-button-icon'));
@@ -2082,10 +2133,12 @@ function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   }, children);
 }
 
-function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null } = {}) {
+function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null, busy = false } = {}) {
   const line = el('p', {
     className: tone ? `wpv-chat__card-state wpv-chat__card-state--${tone}` : 'wpv-chat__card-state',
+    ...(busy ? { 'aria-busy': 'true', role: 'status' } : {}),
   });
+  if (busy) line.appendChild(sendSpinner());
   if (tone === 'added') line.appendChild(strokeIcon('check', 'wpv-chat__card-button-icon'));
   line.appendChild(el('span', { text }));
   if (undoLabel && onUndo) {
@@ -2130,7 +2183,7 @@ function suggestionCard(suggestion, handlers, group = null) {
     }
 
     if (suggestion.regenerating) {
-      children.push(cardStateLine(REGENERATING_NOTE));
+      children.push(cardStateLine(REGENERATING_NOTE, { busy: true }));
     } else if (suggestion.note) {
       children.push(cardStateLine(suggestion.note, { tone: suggestion.noteError ? 'error' : '' }));
     }
@@ -2604,6 +2657,22 @@ function bindComposer(root, initialAuth = {}) {
         if (parsed.suggestions.length > 0) {
           model.suggestions = parsed.suggestions;
           replyText = parsed.reply || 'Here are internal links that could fit this draft.';
+        }
+      }
+
+      // Headline regenerate often answers with a numbered list in `reply` and
+      // an empty `title_variants` array. Pull those lines into title cards so
+      // quiet absorb has a field to swap. Skip when structured variants
+      // already produced a title card.
+      if (
+        state.activeAction === 'headline'
+        && !model.suggestions.some((item) => item.field === 'title')
+      ) {
+        const parsed = parseHeadlineVariantsFromReply(replyText);
+        if (parsed.suggestions.length > 0) {
+          model.suggestions.push(...parsed.suggestions);
+          numberRepeatedLabels(model.suggestions);
+          replyText = parsed.reply || 'Here are some headline options.';
         }
       }
 
