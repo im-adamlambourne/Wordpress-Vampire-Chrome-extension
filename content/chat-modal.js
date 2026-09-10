@@ -753,18 +753,19 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .wpv-chat__action {
-  flex-shrink: 0;
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.7rem;
+  column-gap: 0.35rem;
+  min-inline-size: 0;
+  padding-block: 0.5rem;
+  padding-inline: 0.6rem;
   border: 1px solid var(--ws-hairline);
   border-radius: 0.45rem;
   background: var(--ws-well-4);
@@ -772,6 +773,7 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
+  text-align: start;
   cursor: pointer;
   user-select: none;
   transition:
@@ -829,6 +831,10 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
 }
 
 .wpv-chat__action-label {
+  min-inline-size: 0;
+  text-wrap: nowrap;
+  overflow: clip;
+  text-overflow: ellipsis;
   text-box: trim-both cap alphabetic;
 }
 
@@ -975,6 +981,13 @@ const CHAT_MODAL_CSS = `/* Source of truth for the overlay look. Runtime uses th
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.wpv-chat__card-state .wpv-chat__spinner {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: rgb(58, 181, 244);
 }
 
 .wpv-chat__card-state--added {
@@ -1234,15 +1247,32 @@ function editorType() {
   return typeof detectEditorType === 'function' ? detectEditorType() : null;
 }
 
-function shouldMount() {
-  const type = editorType();
-  return type === 'gutenberg' || type === 'classic' || isEditorPath();
+function currentPostType() {
+  return typeof detectPostType === 'function' ? detectPostType() : '';
 }
 
-function editorChromePresent() {
-  return !!document.getElementById('editor')
-    || document.body?.classList.contains('block-editor-page')
-    || !!document.querySelector('.block-editor, .edit-post-layout');
+function isSupportedEditorPostType() {
+  const postType = currentPostType();
+  if (typeof isSupportedPostType === 'function') {
+    return isSupportedPostType(postType);
+  }
+  return postType === 'post' || postType === 'sxs-recipe' || postType === 'list';
+}
+
+function shouldMount() {
+  const type = editorType();
+  if (type !== 'gutenberg' && type !== 'classic' && !isEditorPath()) {
+    return false;
+  }
+  const postType = currentPostType();
+  if (!postType) return false;
+  return isSupportedEditorPostType();
+}
+
+function shouldRejectMount() {
+  const postType = currentPostType();
+  if (!postType) return false;
+  return !isSupportedEditorPostType();
 }
 
 function svgIcon(paths, { size = 24, strokeWidth = 2 } = {}) {
@@ -1522,6 +1552,8 @@ function fallbackArticleSnapshot() {
     post_id: '',
     post_type: '',
     url: location.href,
+    method_steps: [],
+    list_items: [],
   };
 }
 
@@ -1566,10 +1598,18 @@ async function articleSnapshot() {
       focus_keyphrase: result.snapshot.focus_keyphrase || fallback.focus_keyphrase,
       selection: result.snapshot.selection || fallback.selection,
       editor_type: result.snapshot.editor_type || fallback.editor_type,
+      post_type: result.snapshot.post_type || fallback.post_type,
+      method_steps: pickSnapshotRows(result.snapshot.method_steps, fallback.method_steps),
+      list_items: pickSnapshotRows(result.snapshot.list_items, fallback.list_items),
     };
   } catch {
     return fallback;
   }
+}
+
+function pickSnapshotRows(primary, fallback) {
+  if (Array.isArray(primary) && primary.length > 0) return primary;
+  return Array.isArray(fallback) ? fallback : [];
 }
 
 function compactArticle(article) {
@@ -1581,6 +1621,16 @@ function compactArticle(article) {
     const text = String(next.selection.text || '').trim();
     if (!html && !text) delete next.selection;
     else next.selection = { html, text };
+  }
+  if (fieldsForPostType(next.post_type).includes('method_steps')) {
+    next.method_steps = normaliseMethodSteps(next.method_steps);
+  } else {
+    delete next.method_steps;
+  }
+  if (fieldsForPostType(next.post_type).includes('list_items')) {
+    next.list_items = normaliseListItems(next.list_items);
+  } else {
+    delete next.list_items;
   }
   return next;
 }
@@ -1659,6 +1709,8 @@ function checklistItems(article) {
 
 function hasEdits(edits) {
   if (!edits || typeof edits !== 'object') return false;
+  if (Array.isArray(edits.method_steps) && edits.method_steps.length > 0) return true;
+  if (Array.isArray(edits.list_items) && edits.list_items.length > 0) return true;
   return EDIT_KEYS.some((key) => (
     typeof edits[key] === 'string' && edits[key].trim() !== ''
   ));
@@ -1675,6 +1727,8 @@ function describeApplied(applied) {
     og_title: 'Open Graph title',
     og_description: 'Open Graph description',
     focus_keyphrase: 'focus keyphrase',
+    method_steps: 'method steps',
+    list_items: 'list items',
   };
   const parts = (Array.isArray(applied) ? applied : [])
     .map((key) => labels[key])
@@ -1752,7 +1806,31 @@ async function inferAppliedFields(edits) {
   if (edits.content && contentLooksApplied(article.content, edits.content)) {
     applied.push('body');
   }
+  if (Array.isArray(edits.method_steps) && edits.method_steps.length > 0
+    && methodStepsLookApplied(article.method_steps, edits.method_steps)) {
+    applied.push('method_steps');
+  }
+  if (Array.isArray(edits.list_items) && edits.list_items.length > 0
+    && listItemsLookApplied(article.list_items, edits.list_items)) {
+    applied.push('list_items');
+  }
   return applied;
+}
+
+function methodStepsLookApplied(current, next) {
+  const a = normaliseMethodSteps(current);
+  const b = normaliseMethodSteps(next);
+  if (a.length === 0 || b.length === 0) return false;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => row.kind === b[index].kind && row.text === b[index].text);
+}
+
+function listItemsLookApplied(current, next) {
+  const a = typeof normaliseListItems === 'function' ? normaliseListItems(current) : [];
+  const b = typeof normaliseListItems === 'function' ? normaliseListItems(next) : [];
+  if (a.length === 0 || b.length === 0) return false;
+  if (a.length !== b.length) return false;
+  return a.every((row, index) => row.kind === b[index].kind && row.text === b[index].text);
 }
 
 function sameText(a, b) {
@@ -1965,6 +2043,10 @@ function normaliseReply(result) {
   for (const key of ['content', 'selection']) {
     if (nonEmptyString(edits[key])) direct[key] = edits[key];
   }
+  const methodSteps = normaliseMethodSteps(edits.method_steps);
+  if (methodSteps.length > 0) direct.method_steps = methodSteps;
+  const listItems = typeof normaliseListItems === 'function' ? normaliseListItems(edits.list_items) : [];
+  if (listItems.length > 0) direct.list_items = listItems;
 
   numberRepeatedLabels(suggestions);
   return { suggestions, direct };
@@ -2006,6 +2088,99 @@ function insertLinkIntoBody(html, anchor, href) {
   return found.doc.body.innerHTML;
 }
 
+function articleLinksApplyToMethodSteps(article) {
+  return typeof linksApplyToMethodSteps === 'function'
+    && linksApplyToMethodSteps(article?.post_type);
+}
+
+function articleLinksApplyToListItems(article) {
+  return typeof linksApplyToListItems === 'function'
+    && linksApplyToListItems(article?.post_type);
+}
+
+function cloneMethodSteps(steps) {
+  const normalise = typeof normaliseMethodSteps === 'function' ? normaliseMethodSteps : () => [];
+  return normalise(steps).map((row) => ({ kind: row.kind, text: row.text }));
+}
+
+function insertLinkIntoMethodSteps(steps, anchor, href) {
+  const next = cloneMethodSteps(steps);
+  for (const row of next) {
+    if (row.kind !== 'step') continue;
+    const linked = insertLinkIntoBody(row.text, anchor, href);
+    if (linked === null) continue;
+    row.text = linked;
+    return next;
+  }
+  return null;
+}
+
+function cloneListItems(items) {
+  const normalise = typeof normaliseListItems === 'function' ? normaliseListItems : () => [];
+  return normalise(items).map((row) => ({ kind: row.kind, text: row.text }));
+}
+
+function insertLinkIntoListItems(items, anchor, href) {
+  const next = cloneListItems(items);
+  for (const row of next) {
+    const linked = insertLinkIntoBody(row.text, anchor, href);
+    if (linked === null) continue;
+    row.text = linked;
+    return next;
+  }
+  return null;
+}
+
+function findLinkableInArticle(article, anchor) {
+  if (articleLinksApplyToMethodSteps(article)) {
+    const texts = typeof methodStepLinkTexts === 'function'
+      ? methodStepLinkTexts(article.method_steps)
+      : [];
+    return texts.some((text) => findLinkableText(text, anchor));
+  }
+  if (articleLinksApplyToListItems(article)) {
+    const texts = typeof listItemLinkTexts === 'function'
+      ? listItemLinkTexts(article.list_items)
+      : [];
+    return texts.some((text) => findLinkableText(text, anchor));
+  }
+  return !!findLinkableText(article?.content, anchor);
+}
+
+function linkTargetLabel(article) {
+  if (articleLinksApplyToMethodSteps(article)) return 'method steps';
+  if (articleLinksApplyToListItems(article)) return 'list items';
+  return 'body';
+}
+
+function applyInternalLink(article, suggestion) {
+  if (articleLinksApplyToMethodSteps(article)) {
+    const linked = insertLinkIntoMethodSteps(article.method_steps, suggestion.anchor, suggestion.href);
+    if (!linked) return null;
+    return {
+      previous: { method_steps: cloneMethodSteps(article.method_steps) },
+      edits: { method_steps: linked },
+    };
+  }
+
+  if (articleLinksApplyToListItems(article)) {
+    const linked = insertLinkIntoListItems(article.list_items, suggestion.anchor, suggestion.href);
+    if (!linked) return null;
+    return {
+      previous: { list_items: cloneListItems(article.list_items) },
+      edits: { list_items: linked },
+    };
+  }
+
+  const body = String(article.content || '');
+  const linked = insertLinkIntoBody(body, suggestion.anchor, suggestion.href);
+  if (!linked) return null;
+  return {
+    previous: { content: body },
+    edits: { content: linked },
+  };
+}
+
 /**
  * Interim: read link suggestions out of a prose reply.
  *
@@ -2018,7 +2193,7 @@ function insertLinkIntoBody(html, anchor, href) {
  * A line has to be a bullet carrying an http(s) URL and at least one quoted
  * anchor; anything else is left in the reply untouched.
  */
-function parseLinkSuggestionsFromReply(reply, articleContent) {
+function parseLinkSuggestionsFromReply(reply, article) {
   const lines = String(reply || '').split('\n');
   const suggestions = [];
   const kept = [];
@@ -2043,8 +2218,11 @@ function parseLinkSuggestionsFromReply(reply, articleContent) {
     }
 
     // The agent often offers alternatives ("a" / "b"); take one that is really
-    // in the body so the card does not fail the moment it is accepted.
-    const anchor = anchors.find((candidate) => findLinkableText(articleContent, candidate)) || anchors[0];
+    // in the draft so the card does not fail the moment it is accepted.
+    const haystack = typeof article === 'object' && article !== null
+      ? article
+      : { content: article };
+    const anchor = anchors.find((candidate) => findLinkableInArticle(haystack, candidate)) || anchors[0];
     const target = (after.match(/\(([^)]{3,200})\)/) || [])[1] || '';
 
     suggestions.push({
@@ -2066,6 +2244,44 @@ function parseLinkSuggestionsFromReply(reply, articleContent) {
   };
 }
 
+/**
+ * Headline regenerate (and a first Headline click whose `title_variants` were
+ * empty) often answers with a numbered list in `reply`. Read those lines into
+ * title cards so Accept / Regenerate have a value to swap. Structured
+ * `title_variants` already become cards in `normaliseReply()`; this is only
+ * the prose fallback.
+ */
+function parseHeadlineVariantsFromReply(reply) {
+  const lines = String(reply || '').split('\n');
+  const suggestions = [];
+  const kept = [];
+
+  lines.forEach((line, index) => {
+    const bullet = line.match(/^\s*(?:[-*\u2022\u00b7\u2013\u2014]|\d+[.)])\s+(.+)$/);
+    const title = bullet ? bullet[1].trim().replace(/^["\u201c]|["\u201d]$/g, '') : '';
+    if (!bullet || title.length < 8 || /^(let me know|would you like|if you want)\b/i.test(title)) {
+      kept.push(line);
+      return;
+    }
+
+    suggestions.push({
+      id: `parsed-title-${index}`,
+      kind: 'field',
+      field: 'title',
+      label: FIELD_LABELS.title,
+      value: title,
+      status: 'pending',
+      note: '',
+      noteError: false,
+    });
+  });
+
+  return {
+    suggestions: suggestions.slice(0, 8),
+    reply: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
 function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   const children = [];
   if (icon) children.push(strokeIcon(icon, 'wpv-chat__card-button-icon'));
@@ -2082,10 +2298,12 @@ function cardButton(label, fieldLabel, { className = '', icon = '' } = {}) {
   }, children);
 }
 
-function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null } = {}) {
+function cardStateLine(text, { tone = '', undoLabel = '', fieldLabel = '', onUndo = null, busy = false } = {}) {
   const line = el('p', {
     className: tone ? `wpv-chat__card-state wpv-chat__card-state--${tone}` : 'wpv-chat__card-state',
+    ...(busy ? { 'aria-busy': 'true', role: 'status' } : {}),
   });
+  if (busy) line.appendChild(sendSpinner());
   if (tone === 'added') line.appendChild(strokeIcon('check', 'wpv-chat__card-button-icon'));
   line.appendChild(el('span', { text }));
   if (undoLabel && onUndo) {
@@ -2130,7 +2348,7 @@ function suggestionCard(suggestion, handlers, group = null) {
     }
 
     if (suggestion.regenerating) {
-      children.push(cardStateLine(REGENERATING_NOTE));
+      children.push(cardStateLine(REGENERATING_NOTE, { busy: true }));
     } else if (suggestion.note) {
       children.push(cardStateLine(suggestion.note, { tone: suggestion.noteError ? 'error' : '' }));
     }
@@ -2416,16 +2634,15 @@ function bindComposer(root, initialAuth = {}) {
 
         let applied;
         if (suggestion.kind === 'internal_link') {
-          const body = String(article.content || '');
-          const linked = insertLinkIntoBody(body, suggestion.anchor, suggestion.href);
+          const linked = applyInternalLink(article, suggestion);
           if (!linked) {
-            suggestion.note = `Could not find "${suggestion.anchor}" in the body to link.`;
+            suggestion.note = `Could not find "${suggestion.anchor}" in the ${linkTargetLabel(article)} to link.`;
             suggestion.noteError = true;
             view.render();
             return;
           }
-          suggestion.previous = body;
-          applied = await applyEditorEdits({ content: linked });
+          suggestion.previous = linked.previous;
+          applied = await applyEditorEdits(linked.edits);
         } else {
           // Undo goes back to what the draft held before any of these cards were
           // accepted, not to the card this one is replacing.
@@ -2470,7 +2687,11 @@ function bindComposer(root, initialAuth = {}) {
     onUndo(suggestion, view) {
       return withBusy(async () => {
         const applied = suggestion.kind === 'internal_link'
-          ? await applyEditorEdits({ content: suggestion.previous })
+          ? await applyEditorEdits(
+            suggestion.previous && typeof suggestion.previous === 'object'
+              ? suggestion.previous
+              : { content: suggestion.previous },
+          )
           : await restoreEditorField(suggestion.field, suggestion.previous);
 
         if (applied.statusError) {
@@ -2593,17 +2814,35 @@ function bindComposer(root, initialAuth = {}) {
 
       // Interim, until Content Studio sends `suggestions`: the internal-links
       // action gets its links back as prose, so read them out of the text. Only
-      // when the reply carried no structured suggestions and no body rewrite of
-      // its own, so it can never fight either.
+      // when the reply carried no structured suggestions and no body or method
+      // rewrite of its own, so it can never fight either.
       if (
         state.activeAction === 'internal_links'
         && model.suggestions.length === 0
         && !model.direct.content
+        && !model.direct.method_steps
+        && !model.direct.list_items
       ) {
-        const parsed = parseLinkSuggestionsFromReply(replyText, article.content);
+        const parsed = parseLinkSuggestionsFromReply(replyText, article);
         if (parsed.suggestions.length > 0) {
           model.suggestions = parsed.suggestions;
           replyText = parsed.reply || 'Here are internal links that could fit this draft.';
+        }
+      }
+
+      // Headline regenerate often answers with a numbered list in `reply` and
+      // an empty `title_variants` array. Pull those lines into title cards so
+      // quiet absorb has a field to swap. Skip when structured variants
+      // already produced a title card.
+      if (
+        state.activeAction === 'headline'
+        && !model.suggestions.some((item) => item.field === 'title')
+      ) {
+        const parsed = parseHeadlineVariantsFromReply(replyText);
+        if (parsed.suggestions.length > 0) {
+          model.suggestions.push(...parsed.suggestions);
+          numberRepeatedLabels(model.suggestions);
+          replyText = parsed.reply || 'Here are some headline options.';
         }
       }
 
@@ -2877,8 +3116,18 @@ function buildShell(auth = {}) {
 
   return root;
 }
+async function alignApiHostForPage() {
+  try {
+    await chrome.runtime.sendMessage({ type: 'ALIGN_API_HOST' });
+  } catch {
+    // Service worker may still be starting.
+  }
+}
+
 async function mount() {
   if (document.getElementById(HOST_ID) || !document.body) return;
+
+  await alignApiHostForPage();
 
   const host = document.createElement('div');
   host.id = HOST_ID;
@@ -2917,7 +3166,11 @@ function watchForEditor() {
       observer.disconnect();
       return;
     }
-    if (shouldMount() || editorChromePresent()) {
+    if (shouldRejectMount()) {
+      observer.disconnect();
+      return;
+    }
+    if (shouldMount()) {
       observer.disconnect();
       mount();
     }
@@ -2933,6 +3186,6 @@ function watchForEditor() {
 
 if (shouldMount()) {
   mount();
-} else {
+} else if (!shouldRejectMount()) {
   watchForEditor();
 }

@@ -9,6 +9,12 @@ const MAX_OG_TITLE_CHARS = 200;
 const MAX_OG_DESCRIPTION_CHARS = 500;
 const MAX_FOCUS_KEYPHRASE_CHARS = 200;
 const MAX_SELECTION_CHARS = 8000;
+const METHOD_FLEX_KEY = 'field_sxs-method-recipe-flex';
+const METHOD_STEP_KEY = 'field_sxs-method-recipe-step';
+const METHOD_HEADING_LAYOUT = 'sxs-method-recipe-heading';
+const METHOD_STEP_LAYOUT = 'sxs-method-recipe-step';
+const LIST_FLEX_KEY = 'field_acf_bs_show_listmeta-list_items';
+const LIST_COMMENT_KEY = 'field_acf_bs_show_listmeta-list_items-broadcast_content-editorial_comment';
 
 const SEO_FIELDS = [
   {
@@ -392,11 +398,32 @@ function takeSnapshot(editorType) {
       editor_type: 'classic',
     };
 
-  return truncateSnapshot(fillEmptyFromAcf({
+  const postType = detectPostType();
+  const snapshot = truncateSnapshot(fillEmptyFromAcf({
     ...core,
     ...readSeoSnapshot(),
     selection: takeSelection(editorType),
   }));
+  snapshot.post_type = postType;
+  if (wpvPostTypeAllowsMethodSteps(postType) || methodFlexRoot()) {
+    snapshot.method_steps = readMethodSteps();
+  }
+  if (wpvPostTypeAllowsListItems(postType) || listFlexRoot()) {
+    snapshot.list_items = readListItems();
+  }
+  return snapshot;
+}
+
+function detectPostType() {
+  const fromInput = String(fieldValue('post_type') || '').trim();
+  if (fromInput) return fromInput;
+  const named = document.querySelector('input[name="post_type"]');
+  if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
+  const fromQuery = new URLSearchParams(location.search).get('post_type');
+  if (fromQuery) return fromQuery;
+  const fromBody = wpvPostTypeFromWpBody();
+  if (fromBody) return fromBody;
+  return '';
 }
 
 function truncateSnapshot(snapshot) {
@@ -530,6 +557,29 @@ async function applyEdits(editorType, rawEdits) {
     : applyClassic(edits);
   applied.push(...applySeoFields(edits));
   applied.push(...applyAcfFields(edits, applied));
+  if (Array.isArray(edits.method_steps)
+    && (wpvPostTypeAllowsMethodSteps(detectPostType()) || methodFlexRoot())) {
+    try {
+      if (applyMethodSteps(edits.method_steps)) applied.push('method_steps');
+    } catch {
+      // ACF flexible writes vary by version; other fields may still have applied.
+    }
+  }
+  if (Array.isArray(edits.list_items)
+    && (wpvPostTypeAllowsListItems(detectPostType()) || listFlexRoot())) {
+    try {
+      if (applyListItems(edits.list_items)) applied.push('list_items');
+    } catch {
+      // ACF flexible writes vary by version; other fields may still have applied.
+    }
+  }
+  if (applied.includes('method_steps') || applied.includes('list_items')) {
+    try {
+      window.tinymce?.triggerSave?.();
+    } catch {
+      // Sync TinyMCE back to the matching textarea after an ACF write.
+    }
+  }
   return [...new Set(applied)];
 }
 
@@ -562,13 +612,17 @@ function normaliseEdits(raw) {
       edits[field.key] = raw[field.key].trim().slice(0, field.max);
     }
   }
+  const methodSteps = wpvNormaliseMethodSteps(raw.method_steps);
+  if (methodSteps.length > 0) edits.method_steps = methodSteps;
+  const listItems = wpvNormaliseListItems(raw.list_items);
+  if (listItems.length > 0) edits.list_items = listItems;
   for (const key of clearableKeys(raw.clear)) {
     if (!(key in edits)) edits[key] = '';
   }
   return edits;
 }
 
-/** Keys the overlay may blank on undo. Body and selection are never cleared. */
+/** Keys the overlay may blank on undo. Body, selection, method steps, and list items are never cleared. */
 function clearableKeys(raw) {
   if (!Array.isArray(raw)) return [];
   const allowed = ['title', 'excerpt', ...SEO_FIELDS.map((field) => field.key)];
@@ -958,6 +1012,274 @@ async function waitForAcfFields(timeoutMs = 1200) {
   }
 }
 
+function methodFlexRoot() {
+  return document.querySelector(`.acf-field[data-key="${METHOD_FLEX_KEY}"]`);
+}
+
+function acfRealLayouts(root) {
+  if (!root) return [];
+  const real = (els) => [...els].filter((el) => (
+    el instanceof Element
+    && !el.classList.contains('acf-clone')
+    && el.getAttribute('data-id') !== 'acfcloneindex'
+  ));
+  const preferred = real(root.querySelectorAll('.values > .layout'));
+  if (preferred.length > 0) return preferred;
+  return real(root.querySelectorAll('.layout[data-id], .acf-row[data-id]'));
+}
+
+function methodLayouts() {
+  return acfRealLayouts(methodFlexRoot());
+}
+
+function recognizedMethodLayouts() {
+  return methodLayouts().filter((layout) => methodLayoutKind(layout));
+}
+
+function methodLayoutKind(layout) {
+  const name = String(layout.getAttribute('data-layout') || '');
+  if (name === METHOD_HEADING_LAYOUT || name.endsWith('-heading')) return 'heading';
+  if (name === METHOD_STEP_LAYOUT || name.endsWith('-step')) return 'step';
+  if (layout.querySelector(`.acf-field[data-key="${METHOD_STEP_KEY}"]`)) return 'step';
+  return '';
+}
+
+function methodLayoutWantedName(kind) {
+  return kind === 'heading' ? METHOD_HEADING_LAYOUT : METHOD_STEP_LAYOUT;
+}
+
+function methodLayoutText(layout, kind) {
+  const input = methodLayoutInput(layout, kind);
+  return readAcfInputValue(input);
+}
+
+function methodLayoutInput(layout, kind) {
+  if (kind === 'step') {
+    const field = layout.querySelector(`.acf-field[data-key="${METHOD_STEP_KEY}"]`);
+    if (field) {
+      return field.querySelector('textarea.wp-editor-area, textarea');
+    }
+    return layout.querySelector(
+      `textarea.wp-editor-area[name*="${METHOD_STEP_KEY}"], textarea[name*="[${METHOD_STEP_KEY}]"], textarea[name*="${METHOD_STEP_KEY}"]`,
+    );
+  }
+  const headingField = layout.querySelector('.acf-field[data-type="text"], .acf-field[data-type="textarea"]');
+  if (headingField) {
+    return headingField.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+  }
+  return layout.querySelector('input[type="text"][name*="heading"], textarea[name*="heading"]')
+    || layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+}
+
+function getMethodFlexField() {
+  if (typeof window.acf?.getField !== 'function') return null;
+  try {
+    return window.acf.getField(METHOD_FLEX_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function wpvLookup(name) {
+  if (typeof window !== 'undefined' && typeof window[name] === 'function') return window[name];
+  if (typeof globalThis[name] === 'function') return globalThis[name];
+  return null;
+}
+
+function wpvFallbackNormaliseRows(raw, kinds, maxRows, maxChars, maxTotal) {
+  if (!Array.isArray(raw)) return [];
+  const rows = [];
+  let budget = 0;
+  for (const entry of raw) {
+    if (rows.length >= maxRows) break;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const kind = String(entry.kind || '').trim();
+    if (!kinds.includes(kind)) continue;
+    const text = String(entry.text || '').trim().slice(0, maxChars);
+    if (text === '') continue;
+    budget += text.length;
+    if (budget > maxTotal) break;
+    rows.push({ kind, text });
+  }
+  return rows;
+}
+
+function wpvPostTypeFromWpBody() {
+  const fn = wpvLookup('postTypeFromWpBody');
+  if (fn) return fn(document.body);
+  const match = String(document.body?.className || '').match(/\bpost-type-([a-z0-9_-]+)\b/i);
+  return match ? match[1] : '';
+}
+
+function wpvPostTypeAllowsMethodSteps(postType) {
+  const fn = wpvLookup('postTypeAllowsMethodSteps');
+  if (fn) return fn(postType);
+  return String(postType || '') === 'sxs-recipe';
+}
+
+function wpvNormaliseMethodSteps(raw) {
+  const fn = wpvLookup('normaliseMethodSteps');
+  if (fn) return fn(raw);
+  return wpvFallbackNormaliseRows(raw, ['heading', 'step'], 30, 2000, 20000);
+}
+
+function wpvPostTypeAllowsListItems(postType) {
+  const fn = wpvLookup('postTypeAllowsListItems');
+  if (fn) return fn(postType);
+  return String(postType || '') === 'list';
+}
+
+function wpvNormaliseListItems(raw) {
+  const fn = wpvLookup('normaliseListItems');
+  if (fn) return fn(raw);
+  return wpvFallbackNormaliseRows(raw, ['item'], 40, 4000, 40000);
+}
+
+function listFlexRoot() {
+  return document.querySelector(`.acf-field[data-key="${LIST_FLEX_KEY}"]`);
+}
+
+function listLayouts() {
+  return acfRealLayouts(listFlexRoot());
+}
+
+function listItemCommentInput(layout) {
+  const field = layout.querySelector(`.acf-field[data-key="${LIST_COMMENT_KEY}"]`);
+  if (field) {
+    return field.querySelector('textarea.wp-editor-area, textarea');
+  }
+  return layout.querySelector(
+    `textarea.wp-editor-area[name*="${LIST_COMMENT_KEY}"], textarea[name*="[${LIST_COMMENT_KEY}]"], textarea[name*="${LIST_COMMENT_KEY}"]`,
+  );
+}
+
+function listCommentLayouts() {
+  return listLayouts().filter((layout) => listItemCommentInput(layout));
+}
+
+function listItemCommentText(layout) {
+  return readAcfInputValue(listItemCommentInput(layout));
+}
+
+function readListItems() {
+  return wpvNormaliseListItems(listCommentLayouts().map((layout) => ({
+    kind: 'item',
+    text: listItemCommentText(layout),
+  })));
+}
+
+function applyListItems(rows) {
+  const wanted = wpvNormaliseListItems(rows);
+  const existing = listCommentLayouts();
+  if (wanted.length === 0 || existing.length === 0) return false;
+
+  const count = Math.min(wanted.length, existing.length);
+  let wrote = false;
+  for (let index = 0; index < count; index += 1) {
+    if (writeListItemComment(existing[index], wanted[index].text)) wrote = true;
+  }
+  if (wrote) markAcfChanged();
+  return wrote;
+}
+
+function writeListItemComment(layout, text) {
+  return writeAcfInputValue(listItemCommentInput(layout), text);
+}
+
+function readMethodSteps() {
+  return wpvNormaliseMethodSteps(methodLayouts().map((layout) => {
+    const kind = methodLayoutKind(layout);
+    return kind ? { kind, text: methodLayoutText(layout, kind) } : null;
+  }).filter(Boolean));
+}
+
+function applyMethodSteps(rows) {
+  const wanted = wpvNormaliseMethodSteps(rows);
+  const existing = recognizedMethodLayouts();
+  if (wanted.length === 0 || existing.length === 0) return false;
+
+  const sameShape = wanted.length === existing.length
+    && wanted.every((row, index) => methodLayoutKind(existing[index]) === row.kind);
+
+  // Internal links (and any same-shape rewrite) must update in place. The
+  // add/remove path would rebuild rows and miss TinyMCE, so Accept looked
+  // successful while the method on screen did not change.
+  if (sameShape) {
+    let wrote = false;
+    for (let index = 0; index < wanted.length; index += 1) {
+      if (writeMethodLayout(existing[index], wanted[index])) wrote = true;
+    }
+    if (wrote) markAcfChanged();
+    return wrote;
+  }
+
+  let index = 0;
+  for (; index < wanted.length && index < existing.length; index += 1) {
+    if (methodLayoutKind(existing[index]) !== wanted[index].kind) break;
+    writeMethodLayout(existing[index], wanted[index]);
+  }
+
+  const leftover = recognizedMethodLayouts();
+  for (let j = leftover.length - 1; j >= index; j -= 1) {
+    removeMethodLayout(leftover[j]);
+  }
+
+  for (let j = index; j < wanted.length; j += 1) {
+    const layout = addMethodLayout(wanted[j].kind);
+    if (layout) writeMethodLayout(layout, wanted[j]);
+  }
+
+  markAcfChanged();
+  return true;
+}
+
+function writeMethodLayout(layout, row) {
+  return writeAcfInputValue(methodLayoutInput(layout, row.kind), row.text);
+}
+
+function addMethodLayout(kind) {
+  const field = getMethodFlexField();
+  const layoutName = methodLayoutWantedName(kind);
+  if (field && typeof field.add === 'function') {
+    try {
+      const added = field.add({ layout: layoutName });
+      const el = jqueryEl(added);
+      if (el instanceof Element) return el;
+    } catch {
+      // Fall through to the last real layout.
+    }
+  }
+  const layouts = methodLayouts();
+  return layouts[layouts.length - 1] || null;
+}
+
+function removeMethodLayout(layout) {
+  const field = getMethodFlexField();
+  if (field && typeof field.remove === 'function') {
+    try {
+      field.remove(window.jQuery?.(layout) || layout);
+      return;
+    } catch {
+      // Fall through to acf.remove / DOM.
+    }
+  }
+  if (typeof window.acf?.remove === 'function') {
+    try {
+      window.acf.remove({ layout: window.jQuery?.(layout) || layout });
+      return;
+    } catch {
+      // Fall through to DOM removal.
+    }
+  }
+  layout.remove();
+}
+
+function markAcfChanged() {
+  const input = document.getElementById('_acf_changed')
+    || document.querySelector('input[name="_acf_changed"]');
+  if (input) setFieldValue(input, '1');
+}
+
 function fillEmptyFromAcf(snapshot) {
   const acf = readAcfSemanticSnapshot();
   const next = { ...snapshot };
@@ -1187,12 +1509,75 @@ function acfInputEl(field) {
   );
 }
 
-function writeAcfTinyMce(textarea, value) {
-  const id = textarea?.id;
-  if (!id) return false;
+function readAcfInputValue(input) {
+  if (!input) return '';
+  const editor = tinyMceFor(input);
+  if (editor && typeof editor.getContent === 'function'
+    && (typeof editor.isHidden !== 'function' || !editor.isHidden())) {
+    return String(editor.getContent() || '').trim();
+  }
+  return typeof input.value === 'string' ? input.value.trim() : '';
+}
+
+function writeAcfInputValue(input, text) {
+  if (!input) return false;
+  const safe = stripScripts(String(text || ''));
+  writeAcfTinyMce(input, safe);
+  setFieldValue(input, safe);
   try {
-    const editor = window.tinymce?.get?.(id);
-    if (!editor || typeof editor.setContent !== 'function') return false;
+    const fieldEl = input.closest('.acf-field');
+    const key = fieldEl?.getAttribute('data-key') || '';
+    const parent = fieldEl?.closest('.layout, .acf-row') || fieldEl;
+    let instance = null;
+    if (typeof window.acf?.getFields === 'function' && key) {
+      const found = window.acf.getFields({
+        key,
+        parent: window.jQuery?.(parent) || parent,
+        limit: 1,
+      });
+      instance = found?.[0] || null;
+    }
+    if (instance && typeof instance.val === 'function') instance.val(safe);
+  } catch {
+    // Nested flexible subfields share a key per row; key-only lookup would
+    // write the first row. Parent-scoped getFields is best-effort.
+  }
+  return true;
+}
+
+function tinyMceFor(textarea) {
+  if (!textarea) return null;
+  if (textarea.id) {
+    const byId = window.tinymce?.get?.(textarea.id);
+    if (byId) return byId;
+  }
+  const wrap = textarea.closest('.wp-editor-wrap, .acf-editor-wrap');
+  const area = wrap?.querySelector('textarea.wp-editor-area');
+  if (area?.id) {
+    const byArea = window.tinymce?.get?.(area.id);
+    if (byArea) return byArea;
+  }
+  const field = textarea.closest('.acf-field, .layout');
+  const editors = window.tinymce?.editors;
+  if (field && editors) {
+    for (let i = 0; i < editors.length; i += 1) {
+      const editor = editors[i];
+      if (!editor) continue;
+      const target = (typeof editor.getElement === 'function' ? editor.getElement() : null)
+        || editor.targetElm
+        || (typeof editor.getContainer === 'function' ? editor.getContainer() : null);
+      if (target === textarea || (target instanceof Element && field.contains(target))) {
+        return editor;
+      }
+    }
+  }
+  return null;
+}
+
+function writeAcfTinyMce(textarea, value) {
+  const editor = tinyMceFor(textarea);
+  if (!editor || typeof editor.setContent !== 'function') return false;
+  try {
     if (typeof editor.isHidden === 'function' && editor.isHidden()) return false;
     editor.setContent(value);
     try {

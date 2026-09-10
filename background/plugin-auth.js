@@ -176,7 +176,7 @@ async function storePluginUserName(host, token) {
   }
 }
 
-async function resolvePluginLogin(message) {
+async function resolvePluginLogin(message, sender) {
   if (message?.host && message?.verifier && message?.challenge && message?.state) {
     return startPluginLogin({
       host: message.host,
@@ -186,7 +186,8 @@ async function resolvePluginLogin(message) {
     });
   }
 
-  const apiHost = await ensureApiHost();
+  const aligned = await alignApiHostFromTabUrl(sender?.tab?.url);
+  const apiHost = aligned.host;
   assertAllowedApiHost(apiHost);
   const granted = await chrome.permissions.contains({
     origins: pluginOptionalOrigins(apiHost),
@@ -255,11 +256,23 @@ async function logoutPlugin() {
   return { ok: true };
 }
 
-function handlePluginAuthMessage(message, sendResponse) {
+function handlePluginAuthMessage(message, sender, sendResponse) {
+  if (message?.type === 'ALIGN_API_HOST') {
+    (async () => {
+      try {
+        const aligned = await alignApiHostFromTabUrl(sender?.tab?.url);
+        sendResponse({ ok: true, ...aligned });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message || 'Could not choose a server host.' });
+      }
+    })();
+    return true;
+  }
+
   if (message?.type === 'PLUGIN_LOGIN') {
     (async () => {
       try {
-        sendResponse(await resolvePluginLogin(message));
+        sendResponse(await resolvePluginLogin(message, sender));
       } catch (err) {
         sendResponse({ ok: false, error: err.message || 'Login failed.' });
       }

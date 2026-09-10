@@ -1,4 +1,4 @@
-importScripts('pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
+importScripts('../content/post-type-fields.js', 'pkce.js', 'plugin-auth.js', 'plugin-chat.js', 'plugin-echo.js');
 
 function statusIconPath(connected) {
   const suffix = connected ? 'connected' : 'disconnected';
@@ -47,7 +47,7 @@ async function applyStatus(connected, tabId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (handlePluginAuthMessage(message, sendResponse)) {
+  if (handlePluginAuthMessage(message, sender, sendResponse)) {
     return true;
   }
 

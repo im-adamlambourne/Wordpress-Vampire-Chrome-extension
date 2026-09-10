@@ -1,5 +1,6 @@
 const PLUGIN_CLIENT_ID = 'content-studio-plugin';
 const DEFAULT_API_HOST = 'https://develop.content-studio.im';
+const PRODUCTION_API_HOST = 'https://content-studio.im';
 
 const ALLOWED_API_ORIGINS = [
   'https://content-studio.im',
@@ -10,9 +11,12 @@ const ALLOWED_API_ORIGINS = [
   'http://127.0.0.1:8080',
 ];
 
+const WP_PRODUCTION_HOST_SUFFIX = '.production.wcp.imdserve.com';
+const WP_RELEASE_HOST_SUFFIX = '.release.wcp.imdserve.com';
+
 const WP_ADMIN_HOST_SUFFIXES = [
-  '.production.wcp.imdserve.com',
-  '.release.wcp.imdserve.com',
+  WP_PRODUCTION_HOST_SUFFIX,
+  WP_RELEASE_HOST_SUFFIX,
 ];
 
 const WP_ADMIN_TAB_URLS = [
@@ -55,6 +59,71 @@ async function ensureApiHost() {
 
   await chrome.storage.local.set({ apiHost: DEFAULT_API_HOST });
   return DEFAULT_API_HOST;
+}
+
+function apiHostForWpHostname(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  if (host.endsWith(WP_PRODUCTION_HOST_SUFFIX) && host.length > WP_PRODUCTION_HOST_SUFFIX.length) {
+    return PRODUCTION_API_HOST;
+  }
+  if (host.endsWith(WP_RELEASE_HOST_SUFFIX) && host.length > WP_RELEASE_HOST_SUFFIX.length) {
+    return DEFAULT_API_HOST;
+  }
+  if (isLoopbackHostname(host)) {
+    return DEFAULT_API_HOST;
+  }
+  return null;
+}
+
+function apiHostForWpUrl(url) {
+  if (!isWpAdminUrl(url)) return null;
+  try {
+    return apiHostForWpHostname(new URL(url).hostname);
+  } catch {
+    return null;
+  }
+}
+
+function apiHostIsManual(apiHostManual) {
+  return apiHostManual === true;
+}
+
+async function alignApiHostFromTabUrl(tabUrl) {
+  const { apiHostManual } = await chrome.storage.local.get('apiHostManual');
+  const manual = apiHostIsManual(apiHostManual);
+  if (manual) {
+    return { host: await ensureApiHost(), changed: false, manual: true };
+  }
+
+  const suggested = apiHostForWpUrl(tabUrl);
+  if (!suggested) {
+    return { host: await ensureApiHost(), changed: false, manual: false };
+  }
+
+  const { apiHost } = await chrome.storage.local.get('apiHost');
+  const current = typeof apiHost === 'string' && apiHost.trim() !== '' ? apiHost : '';
+  if (current === suggested) {
+    return { host: current, changed: false, manual: false };
+  }
+
+  if (current) {
+    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
+  }
+  await chrome.storage.local.set({ apiHost: suggested });
+  return { host: suggested, changed: true, manual: false };
+}
+
+async function saveApiHost(host, { manual }) {
+  const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
+  if (previousHost && previousHost !== host) {
+    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
+  }
+
+  await chrome.storage.local.set({
+    apiHost: host,
+    apiHostManual: Boolean(manual),
+  });
+  return { previousHost };
 }
 
 function normalizeApiHost(value) {

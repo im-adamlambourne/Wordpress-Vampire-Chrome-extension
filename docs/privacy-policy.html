@@ -60,14 +60,14 @@
   <a class="skip" href="#policy">Skip to privacy policy</a>
   <header>
     <h1>Privacy Policy for Content Studio</h1>
-    <p class="meta">Last updated: <time datetime="2026-08-26">26 August 2026</time></p>
+    <p class="meta">Last updated: <time datetime="2026-09-09">9 September 2026</time></p>
   </header>
   <main id="policy" tabindex="-1">
     <p>
       Content Studio is a Chrome extension published by Immediate Media Company
       Limited (“Immediate”, “we”) for Immediate Media staff. It helps editors
-      revise an open WordPress draft from a chat overlay, and open Workspace
-      features from the toolbar. Immediate Media Company Limited is the data
+      revise an open WordPress draft from a chat overlay. Sign-in and settings
+      live in the toolbar popup. Immediate Media Company Limited is the data
       controller for this product.
     </p>
     <p>
@@ -105,9 +105,8 @@
       We only collect, use, and share user data as needed for the extension’s
       <strong>single purpose</strong>: letting a signed-in editor revise the
       open WordPress draft from a chat overlay (title, selected copy, body,
-      excerpt, SEO, Open Graph, and focus keyphrase) and open their Content
-      Studio Workspace features, including operating, securing, and supporting
-      those features.
+      excerpt, SEO, Open Graph, and focus keyphrase), including operating,
+      securing, and supporting those features.
     </p>
     <p>
       The use of information received from Google APIs will adhere to the
@@ -135,10 +134,16 @@
         your private chat channel.
       </li>
       <li>
-        <strong>Server address.</strong> The Content Studio host you enter in
-        Settings (<code>https://content-studio.im</code>,
-        <code>https://develop.content-studio.im</code>, or a local
-        <code>http://localhost</code> origin).
+        <strong>Server address.</strong> The Content Studio host for this
+        browser: matched from the WordPress site you are on
+        (<code>*.release.wcp.imdserve.com</code> uses
+        <code>https://develop.content-studio.im</code>,
+        <code>*.production.wcp.imdserve.com</code> uses
+        <code>https://content-studio.im</code>) unless you choose a different
+        origin in Settings (Production, Develop, or a local
+        <code>http://localhost</code> origin). If you save a host that is not
+        the one for that WordPress site, the extension also stores that you
+        overrode the match.
       </li>
       <li>
         <strong>Chat and draft content.</strong> When you send a message, the
@@ -153,16 +158,15 @@
         WordPress Cloud Platform admin
         (<code>*.production.wcp.imdserve.com</code> or
         <code>*.release.wcp.imdserve.com</code>), to show a connected or
-        disconnected toolbar icon, and — when you
-        are signed in — to send that address to your Content Studio server so
-        the toolbar popup can show the Workspace features for the matching
-        assigned site. It does not keep a browsing history.
+        disconnected toolbar icon, and to choose the matching Content Studio
+        host when you have not saved an override. It does not keep a browsing history.
       </li>
       <li>
-        <strong>Workspace features.</strong> When the toolbar popup is open
-        while you are signed in, the extension asks your Content Studio server
-        which Workspace sites and features you can use, then shows those
-        buttons. Clicking a button opens Content Studio Workspace in a new tab.
+        <strong>Workspace features.</strong> The signed-in toolbar popup does
+        not currently show Workspace buttons and does not request a Workspace
+        catalog. A later build may show those buttons; if it does, the
+        extension will ask Content Studio which sites and features you can use
+        and may send the current tab address so the matching site is selected.
       </li>
       <li>
         <strong>Device environment.</strong> When you send a chat message, the
@@ -181,7 +185,7 @@
     <h2 id="data-stored">How data is stored</h2>
     <ul>
       <li>
-        Host, access token, display name, user id, and public realtime
+        Host, whether you overrode the auto-picked host, access token, display name, user id, and public realtime
         connection settings returned at login (host, port, and app key — never
         the server secret) are stored in Chrome’s local extension storage on
         your computer. They are not synced through your Google account.
@@ -204,7 +208,6 @@
       <li>Send your prompt and draft snapshot to Content Studio so the assistant can suggest revisions.</li>
       <li>Record the client operating system, browser, and extension version with each chat turn so Content Studio can support the plugin.</li>
       <li>Apply suggested edits to the open WordPress editor. The extension does not save or publish the post.</li>
-      <li>Show Workspace feature buttons for your assigned site.</li>
       <li>Show a login-success notification after you connect your account.</li>
     </ul>
 
@@ -229,7 +232,6 @@
         headline ideas can arrive without keeping a long HTTP request open
       </li>
       <li>Channel authorization for that private chat connection</li>
-      <li>The Workspace catalog for the signed-in toolbar popup</li>
     </ul>
     <p>
       Content Studio may use AI providers to generate replies, headline ideas,
@@ -316,8 +318,8 @@
 
     <h2 id="permissions">Permissions in plain language</h2>
     <ul>
-      <li><strong>Tabs</strong> — detect an Immediate Media WordPress Cloud Platform admin tab so the icon can show connected or disconnected, and match Workspace features to the current site.</li>
-      <li><strong>Storage</strong> — remember your server, sign-in token, display name, user id, and realtime settings.</li>
+      <li><strong>Tabs</strong> — detect an Immediate Media WordPress Cloud Platform admin tab so the icon can show connected or disconnected, and so the matching Content Studio host can be selected when you have not saved an override.</li>
+      <li><strong>Storage</strong> — remember your server, whether you overrode the auto-picked host, sign-in token, display name, user id, and realtime settings.</li>
       <li><strong>Identity</strong> — open the Content Studio sign-in window and return you to the extension.</li>
       <li><strong>Notifications</strong> — confirm a successful login after the sign-in window closes.</li>
       <li><strong>Offscreen documents</strong> — keep a quiet background page so chat replies can arrive after you send a message.</li>
