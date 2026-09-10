@@ -83,7 +83,9 @@ const PLUGIN_CHAT_ACTIONS = [
   'images',
 ];
 
-async function sendPluginChat({ message, history, article, action }, tabId) {
+async function sendPluginChat({ message, history, article, action }, sender) {
+  const tabId = sender?.tab?.id;
+  await alignApiHostFromTabUrl(sender?.tab?.url);
   const { apiHost, apiToken } = await chrome.storage.local.get(['apiHost', 'apiToken']);
 
   if (!apiHost || !apiToken) {
@@ -238,7 +240,7 @@ function handlePluginChatMessage(message, sender, sendResponse) {
 
   (async () => {
     try {
-      sendResponse(await sendPluginChat(message, sender.tab?.id));
+      sendResponse(await sendPluginChat(message, sender));
     } catch (err) {
       sendResponse({ ok: false, error: err.message || 'Chat failed.' });
     }

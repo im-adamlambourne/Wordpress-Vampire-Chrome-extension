@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - GitHub releases are cut automatically from `manifest.json`. `.github/workflows/release.yml` watches `manifest.json` on `main` (the release branch); when the version changes it tags `v{version}`, uses that version's `CHANGELOG.md` section as the release notes (via `scripts/release-notes.sh`), and attaches the `scripts/package-cws.sh` ZIP. A version that is already released is a no-op, and a missing changelog section fails the run rather than publishing empty notes.
 
+### Changed
+
+- The plugin picks a Content Studio host from the WordPress tab unless you override it in Settings: `*.release.wcp.imdserve.com` uses Develop, `*.production.wcp.imdserve.com` uses Production, and loopback still uses Develop. Saving or logging in with a different Server host remembers that choice until you save again. Saving the host that matches this WordPress tab turns auto-matching back on.
+- The assistant overlay only mounts on `post`, `sxs-recipe`, and `list` editors. Pages and other post types still attach for session debug, but the chat shell stays off.
+
 ## [0.9.0] - 2026-09-10
 
 ### Added

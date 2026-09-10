@@ -134,10 +134,16 @@
         your private chat channel.
       </li>
       <li>
-        <strong>Server address.</strong> The Content Studio host you enter in
-        Settings (<code>https://content-studio.im</code>,
-        <code>https://develop.content-studio.im</code>, or a local
-        <code>http://localhost</code> origin).
+        <strong>Server address.</strong> The Content Studio host for this
+        browser: matched from the WordPress site you are on
+        (<code>*.release.wcp.imdserve.com</code> uses
+        <code>https://develop.content-studio.im</code>,
+        <code>*.production.wcp.imdserve.com</code> uses
+        <code>https://content-studio.im</code>) unless you choose a different
+        origin in Settings (Production, Develop, or a local
+        <code>http://localhost</code> origin). If you save a host that is not
+        the one for that WordPress site, the extension also stores that you
+        overrode the match.
       </li>
       <li>
         <strong>Chat and draft content.</strong> When you send a message, the
@@ -152,7 +158,8 @@
         WordPress Cloud Platform admin
         (<code>*.production.wcp.imdserve.com</code> or
         <code>*.release.wcp.imdserve.com</code>), to show a connected or
-        disconnected toolbar icon. It does not keep a browsing history.
+        disconnected toolbar icon, and to choose the matching Content Studio
+        host when you have not saved an override. It does not keep a browsing history.
       </li>
       <li>
         <strong>Workspace features.</strong> The signed-in toolbar popup does
@@ -178,7 +185,7 @@
     <h2 id="data-stored">How data is stored</h2>
     <ul>
       <li>
-        Host, access token, display name, user id, and public realtime
+        Host, whether you overrode the auto-picked host, access token, display name, user id, and public realtime
         connection settings returned at login (host, port, and app key — never
         the server secret) are stored in Chrome’s local extension storage on
         your computer. They are not synced through your Google account.
@@ -311,8 +318,8 @@
 
     <h2 id="permissions">Permissions in plain language</h2>
     <ul>
-      <li><strong>Tabs</strong> — detect an Immediate Media WordPress Cloud Platform admin tab so the icon can show connected or disconnected.</li>
-      <li><strong>Storage</strong> — remember your server, sign-in token, display name, user id, and realtime settings.</li>
+      <li><strong>Tabs</strong> — detect an Immediate Media WordPress Cloud Platform admin tab so the icon can show connected or disconnected, and so the matching Content Studio host can be selected when you have not saved an override.</li>
+      <li><strong>Storage</strong> — remember your server, whether you overrode the auto-picked host, sign-in token, display name, user id, and realtime settings.</li>
       <li><strong>Identity</strong> — open the Content Studio sign-in window and return you to the extension.</li>
       <li><strong>Notifications</strong> — confirm a successful login after the sign-in window closes.</li>
       <li><strong>Offscreen documents</strong> — keep a quiet background page so chat replies can arrive after you send a message.</li>

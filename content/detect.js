@@ -41,7 +41,13 @@ function detectPostId() {
 function detectPostType() {
   const fromInput = valueOf('#post_type') || valueOf('input[name="post_type"]');
   if (fromInput) return fromInput;
-  return new URLSearchParams(location.search).get('post_type') || '';
+  const fromQuery = new URLSearchParams(location.search).get('post_type');
+  if (fromQuery) return fromQuery;
+  if (typeof postTypeFromWpBody === 'function') {
+    return postTypeFromWpBody(document.body);
+  }
+  const match = String(document.body?.className || '').match(/\bpost-type-([a-z0-9_-]+)\b/i);
+  return match ? match[1] : '';
 }
 
 function detectTitle() {

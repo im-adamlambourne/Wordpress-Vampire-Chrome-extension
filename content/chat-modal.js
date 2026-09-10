@@ -1247,15 +1247,32 @@ function editorType() {
   return typeof detectEditorType === 'function' ? detectEditorType() : null;
 }
 
-function shouldMount() {
-  const type = editorType();
-  return type === 'gutenberg' || type === 'classic' || isEditorPath();
+function currentPostType() {
+  return typeof detectPostType === 'function' ? detectPostType() : '';
 }
 
-function editorChromePresent() {
-  return !!document.getElementById('editor')
-    || document.body?.classList.contains('block-editor-page')
-    || !!document.querySelector('.block-editor, .edit-post-layout');
+function isSupportedEditorPostType() {
+  const postType = currentPostType();
+  if (typeof isSupportedPostType === 'function') {
+    return isSupportedPostType(postType);
+  }
+  return postType === 'post' || postType === 'sxs-recipe' || postType === 'list';
+}
+
+function shouldMount() {
+  const type = editorType();
+  if (type !== 'gutenberg' && type !== 'classic' && !isEditorPath()) {
+    return false;
+  }
+  const postType = currentPostType();
+  if (!postType) return false;
+  return isSupportedEditorPostType();
+}
+
+function shouldRejectMount() {
+  const postType = currentPostType();
+  if (!postType) return false;
+  return !isSupportedEditorPostType();
 }
 
 function svgIcon(paths, { size = 24, strokeWidth = 2 } = {}) {
@@ -3099,8 +3116,18 @@ function buildShell(auth = {}) {
 
   return root;
 }
+async function alignApiHostForPage() {
+  try {
+    await chrome.runtime.sendMessage({ type: 'ALIGN_API_HOST' });
+  } catch {
+    // Service worker may still be starting.
+  }
+}
+
 async function mount() {
   if (document.getElementById(HOST_ID) || !document.body) return;
+
+  await alignApiHostForPage();
 
   const host = document.createElement('div');
   host.id = HOST_ID;
@@ -3139,7 +3166,11 @@ function watchForEditor() {
       observer.disconnect();
       return;
     }
-    if (shouldMount() || editorChromePresent()) {
+    if (shouldRejectMount()) {
+      observer.disconnect();
+      return;
+    }
+    if (shouldMount()) {
       observer.disconnect();
       mount();
     }
@@ -3155,6 +3186,6 @@ function watchForEditor() {
 
 if (shouldMount()) {
   mount();
-} else {
+} else if (!shouldRejectMount()) {
   watchForEditor();
 }

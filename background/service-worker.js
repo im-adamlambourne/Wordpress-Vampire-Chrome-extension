@@ -47,7 +47,7 @@ async function applyStatus(connected, tabId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (handlePluginAuthMessage(message, sendResponse)) {
+  if (handlePluginAuthMessage(message, sender, sendResponse)) {
     return true;
   }
 

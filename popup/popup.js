@@ -19,6 +19,7 @@ const cexAuthEl = document.getElementById('cex-auth');
 const cexStatusEl = document.getElementById('cex-status');
 const hostForm = document.getElementById('cex-host-form');
 const hostSelect = document.getElementById('cex-host');
+const hostHint = document.getElementById('cex-host-hint');
 const LOOPBACK_HOST_ALIASES = {
   'http://127.0.0.1': 'http://localhost',
   'http://127.0.0.1:8080': 'http://localhost',
@@ -107,6 +108,23 @@ function setHostSelectValue(host) {
   hostSelect.value = hostSelectHasValue(value) ? value : DEFAULT_API_HOST;
 }
 
+function setHostHint({ manual, tabUrl }) {
+  let text = '';
+  if (manual) {
+    text = 'Using the host you saved.';
+  } else if (apiHostForWpUrl(tabUrl)) {
+    text = 'Matched from this WordPress site.';
+  }
+
+  hostHint.textContent = text;
+  hostHint.hidden = !text;
+  if (text) {
+    hostSelect.setAttribute('aria-describedby', 'cex-host-hint');
+  } else {
+    hostSelect.removeAttribute('aria-describedby');
+  }
+}
+
 async function grantAndSaveHost(host) {
   assertAllowedApiHost(host);
   let granted;
@@ -119,23 +137,27 @@ async function grantAndSaveHost(host) {
     return { granted: false };
   }
 
-  const { apiHost: previousHost } = await chrome.storage.local.get('apiHost');
-  if (previousHost && previousHost !== host) {
-    await chrome.storage.local.remove(PLUGIN_SESSION_KEYS);
-  }
-
-  await chrome.storage.local.set({ apiHost: host });
+  const suggested = apiHostForWpUrl(await activeTabHttpUrl());
+  const manual = Boolean(suggested) && host !== suggested;
+  const { previousHost } = await saveApiHost(host, { manual });
   setHostSelectValue(host);
   return { granted: true, previousHost };
 }
 
 async function loadCexAuth() {
-  const apiHost = await ensureApiHost();
-  const { apiToken, apiUserName } = await chrome.storage.local.get([
+  const tabUrl = await activeTabHttpUrl();
+  const aligned = await alignApiHostFromTabUrl(tabUrl);
+  const apiHost = aligned.host;
+  const { apiToken, apiUserName, apiHostManual } = await chrome.storage.local.get([
     'apiToken',
     'apiUserName',
+    'apiHostManual',
   ]);
   setHostSelectValue(apiHost);
+  setHostHint({
+    manual: apiHostIsManual(apiHostManual) || aligned.manual,
+    tabUrl,
+  });
 
   syncAccountHeader(Boolean(apiToken), apiUserName || '');
 

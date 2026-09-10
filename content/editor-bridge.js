@@ -419,7 +419,11 @@ function detectPostType() {
   if (fromInput) return fromInput;
   const named = document.querySelector('input[name="post_type"]');
   if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
-  return new URLSearchParams(location.search).get('post_type') || '';
+  const fromQuery = new URLSearchParams(location.search).get('post_type');
+  if (fromQuery) return fromQuery;
+  const fromBody = wpvPostTypeFromWpBody();
+  if (fromBody) return fromBody;
+  return '';
 }
 
 function truncateSnapshot(snapshot) {
@@ -1098,6 +1102,13 @@ function wpvFallbackNormaliseRows(raw, kinds, maxRows, maxChars, maxTotal) {
     rows.push({ kind, text });
   }
   return rows;
+}
+
+function wpvPostTypeFromWpBody() {
+  const fn = wpvLookup('postTypeFromWpBody');
+  if (fn) return fn(document.body);
+  const match = String(document.body?.className || '').match(/\bpost-type-([a-z0-9_-]+)\b/i);
+  return match ? match[1] : '';
 }
 
 function wpvPostTypeAllowsMethodSteps(postType) {

@@ -1,8 +1,9 @@
 /**
  * Which editor fields the plugin may snapshot and apply, by WordPress post_type.
- * Overlay actions stay the same on every type; this only gates the draft fields.
+ * Overlay actions stay the same on every supported type; this gates draft fields
+ * and whether the assistant overlay mounts.
  *
- * `post` and any unlisted type share today's article fields.
+ * Only `post`, `sxs-recipe`, and `list` show the overlay.
  * `sxs-recipe` adds method_steps (ACF flexible method). Internal links search
  * those steps.
  * `list` adds list_items (ACF flexible list; editorial comments only).
@@ -15,8 +16,14 @@
  * the page `window` the bridge reads.
  */
 (function installPostTypeFields(global) {
+  const ARTICLE_POST_TYPE = 'post';
   const RECIPE_POST_TYPE = 'sxs-recipe';
   const LIST_POST_TYPE = 'list';
+  const SUPPORTED_POST_TYPES = Object.freeze([
+    ARTICLE_POST_TYPE,
+    RECIPE_POST_TYPE,
+    LIST_POST_TYPE,
+  ]);
   const MAX_METHOD_STEPS = 30;
   const MAX_METHOD_STEP_CHARS = 2000;
   const MAX_METHOD_STEPS_CHARS = 20000;
@@ -43,6 +50,15 @@
 
   function postTypeAllowsListItems(postType) {
     return String(postType || '') === LIST_POST_TYPE;
+  }
+
+  function isSupportedPostType(postType) {
+    return SUPPORTED_POST_TYPES.includes(String(postType || ''));
+  }
+
+  function postTypeFromWpBody(body) {
+    const match = String(body?.className || '').match(/\bpost-type-([a-z0-9_-]+)\b/i);
+    return match ? match[1] : '';
   }
 
   function fieldsForPostType(postType) {
@@ -120,8 +136,12 @@
   }
 
   const installed = {
+    ARTICLE_POST_TYPE,
     RECIPE_POST_TYPE,
     LIST_POST_TYPE,
+    SUPPORTED_POST_TYPES,
+    isSupportedPostType,
+    postTypeFromWpBody,
     postTypeAllowsMethodSteps,
     postTypeAllowsListItems,
     fieldsForPostType,

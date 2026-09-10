@@ -364,6 +364,17 @@ main {
   outline-offset: 2px;
 }
 
+.host-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-muted);
+}
+
+.host-hint[hidden] {
+  display: none;
+}
+
 .cex-actions {
   margin-block-start: 14px;
 }
