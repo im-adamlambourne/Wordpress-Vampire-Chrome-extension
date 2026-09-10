@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Content Studio
 
-> Last Updated: 2026-09-09
+> Last Updated: 2026-09-10
 
 Private Immediate Media listing. Not searchable on the public Chrome Web Store.
 Copy the fields below into the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
@@ -16,7 +16,7 @@ Use **Private**, not Unlisted. Unlisted is installable by anyone who has the URL
 2. Pay the one-time developer registration fee if the dashboard asks for it.
 3. **Account** tab → **Trusted testers**: add staff Google accounts if you are not using domain publishing (each address must be a Google account).
 4. Confirm `https://content-studio.im/plugin/privacy` (and `https://develop.content-studio.im/plugin/privacy`) load **without signing in**. Reviewers open this link. Intranet or a login wall will fail review. Paste the production URL into **Privacy Policy URL** below and in the dashboard. Local Sail is `{APP_URL}/plugin/privacy` (this file is also at `docs/privacy-policy.html` if you need a gist fallback).
-5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.8.0.zip` as a new item.
+5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.9.0.zip` as a new item. The same ZIP is attached to the `v0.9.0` [GitHub release](https://github.com/im-adamlambourne/Wordpress-Vampire-Chrome-extension/releases) if you would rather download it than build it.
 6. As soon as the item exists, copy the **Item ID**. That ID is the production extension ID. Register this redirect on Content Studio (Laravel) before staff try store-build login:
 
    `https://<ITEM_ID>.chromiumapp.org/`
@@ -81,7 +81,7 @@ This extension is for Immediate Media staff. It is not affiliated with Automatti
 SUPPORT
 Use the contact email on this listing or the Immediate Media Content Studio team.
 
-Version 0.8.0 — Action-led overlay with reviewable suggestion cards (Internal links, Headline, Standfirst, SEO metadata); Workspace feature grid hidden for the beta.
+Version 0.9.0 — Snapshot and apply follow the WordPress post type: Method Steps on Good Food recipes and editorial comments on Radio Times lists, alongside headline, standfirst, body, SEO and Open Graph.
 
 **Category** [REQUIRED]
 Productivity
@@ -237,6 +237,7 @@ The popup still opens. Log in prompts for access to https://develop.content-stud
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 0.9.0 | 2026-09-10 | Snapshot and apply follow the WordPress `post_type`. `sxs-recipe` also reads and writes Method Steps (Good Food ACF flexible `field_sxs-method-recipe-flex`); `list` also reads and writes list item editorial comments (Radio Times ACF flexible `field_acf_bs_show_listmeta-list_items`). **Internal links** applies to those fields on those post types. Overlay buttons and permissions are unchanged. | Draft |
 | 0.8.0 | 2026-09-09 | Action-led overlay: Internal links, Headline, Standfirst and SEO metadata as reviewable cards (Accept / Regenerate / Reject / Undo). Workspace feature grid and free-text chat hidden for the beta. Regenerating a card stays on that card. Popup host is a Production / Develop / Local dropdown. Default server remains Develop (`https://develop.content-studio.im`). | Released |
 | 0.7.1 | 2026-08-26 | Content scripts and overlay assets limited to Immediate Media WCP admin (`*.production.wcp.imdserve.com`, `*.release.wcp.imdserve.com`) and loopback. Optional hosts limited to Content Studio and realtime origins (no `http://*/*` / `https://*/*`) to clear Chrome Web Store Broad Host Permissions. Classic Editor **Add Footers** control stays in the media-button row but is hidden. Default Content Studio host is `https://develop.content-studio.im`. Public privacy policy at `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy`. | Draft |
 | 0.7.0 | 2026-08-20 | Signed-in toolbar popup shows Workspace feature buttons for the user’s assigned site (`GET /api/plugin/workspace`), using the same glyphs as the Workspace dashboard. Clicking a button opens `/workspace/{siteId}?feature={key}`. | Draft |

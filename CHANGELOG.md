@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GitHub releases are cut automatically from `manifest.json`. `.github/workflows/release.yml` watches `manifest.json` on `main` (the release branch); when the version changes it tags `v{version}`, uses that version's `CHANGELOG.md` section as the release notes (via `scripts/release-notes.sh`), and attaches the `scripts/package-cws.sh` ZIP. A version that is already released is a no-op, and a missing changelog section fails the run rather than publishing empty notes.
+
+## [0.9.0] - 2026-09-10
+
+### Added
+
 - Snapshot and apply follow the WordPress `post_type`. `post` keeps today's fields (headline, body, standfirst/Description, Open Graph, SEO, focus keyphrase). `sxs-recipe` also reads and writes **Method Steps** (Good Food ACF flexible `field_sxs-method-recipe-flex`). `list` also reads and writes **list item editorial comments** (Radio Times ACF flexible `field_acf_bs_show_listmeta-list_items`, `broadcast_shows_content` comments only). Method-step rewrites apply immediately, like body. Overlay action buttons are unchanged.
 
 ### Changed

@@ -70,7 +70,7 @@ The WebSocket host is **only** `broadcasting` from the token response (stored in
 
 Staff install is a **Private** Chrome Web Store listing (not public search). Unlisted is the wrong setting: anyone with the URL could install it.
 
-Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.8.0.zip`). The privacy policy is `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy` (`GET /plugin/privacy` on Content Studio; copy in `docs/privacy-policy.html`). It must load without signing in.
+Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.9.0.zip`), or download that ZIP from the matching [GitHub release](https://github.com/im-adamlambourne/Wordpress-Vampire-Chrome-extension/releases) — bumping `manifest.json` and merging to `main` tags and builds one automatically (see `AGENTS.md`). The privacy policy is `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy` (`GET /plugin/privacy` on Content Studio; copy in `docs/privacy-policy.html`). It must load without signing in.
 
 After the store assigns an item ID, add `https://<item-id>.chromiumapp.org/` to the Content Studio OAuth client. Unpacked-dev and store builds use different extension IDs.
 

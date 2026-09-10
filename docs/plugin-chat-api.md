@@ -94,7 +94,7 @@ reply back to the right tab.
     // "list_items": [{ "kind": "item", "text": "…" }]    // list only
   },
   "telemetry": {                          // omitted when nothing could be detected
-    "extension_version": "0.8.0",
+    "extension_version": "0.9.0",
     "os": "macOS", "os_version": "15.6",
     "browser": "Google Chrome", "browser_version": "…"
   }
