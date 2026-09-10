@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Content Studio
 
-> Last Updated: 2026-08-26
+> Last Updated: 2026-09-10
 
 Private Immediate Media listing. Not searchable on the public Chrome Web Store.
 Copy the fields below into the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
@@ -16,7 +16,7 @@ Use **Private**, not Unlisted. Unlisted is installable by anyone who has the URL
 2. Pay the one-time developer registration fee if the dashboard asks for it.
 3. **Account** tab → **Trusted testers**: add staff Google accounts if you are not using domain publishing (each address must be a Google account).
 4. Confirm `https://content-studio.im/plugin/privacy` (and `https://develop.content-studio.im/plugin/privacy`) load **without signing in**. Reviewers open this link. Intranet or a login wall will fail review. Paste the production URL into **Privacy Policy URL** below and in the dashboard. Local Sail is `{APP_URL}/plugin/privacy` (this file is also at `docs/privacy-policy.html` if you need a gist fallback).
-5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.7.1.zip` as a new item.
+5. Run `./scripts/package-cws.sh` and upload `dist/content-studio-plugin-v0.9.0.zip` as a new item. The same ZIP is attached to the `v0.9.0` [GitHub release](https://github.com/im-adamlambourne/Wordpress-Vampire-Chrome-extension/releases) if you would rather download it than build it.
 6. As soon as the item exists, copy the **Item ID**. That ID is the production extension ID. Register this redirect on Content Studio (Laravel) before staff try store-build login:
 
    `https://<ITEM_ID>.chromiumapp.org/`
@@ -40,40 +40,38 @@ Official visibility docs: [Set up distribution](https://developer.chrome.com/doc
 Content Studio
 
 **Short Description** [REQUIRED]
-Revise WordPress drafts from a chat overlay, and open your Content Studio Workspace features from the toolbar.
+Revise WordPress drafts from a chat overlay. Sign in from the toolbar popup.
 
 **Detailed Description** [REQUIRED]
 
-Content Studio adds a revision assistant to Immediate Media WordPress Cloud Platform post editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) so you can chat about the open draft and apply suggested copy without leaving the page.
+Content Studio adds a revision assistant to Immediate Media WordPress Cloud Platform post editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) so you can improve the open draft without leaving the page.
 
 FEATURES
-• Chat overlay on Gutenberg and Classic editors (posts and pages).
-• Updates title, selected copy, body, excerpt, SEO title and description, Open Graph title and description, and focus keyphrase in the open draft.
+• Assistant overlay on Gutenberg and Classic editors for posts, Good Food recipes, and Radio Times lists (named Content Studio Assistant). It does not appear on pages or other post types.
+• Action buttons for Internal links, Headline, Standfirst, and SEO metadata. Suggestions arrive as reviewable cards: Accept writes that field into the draft, Regenerate asks for another value, Reject dismisses it, Undo puts the previous value back.
+• Updates title, selected copy, body, excerpt, SEO title and description, Open Graph title and description, and focus keyphrase in the open draft (body and selection apply as soon as the reply lands; other fields wait until you Accept a card).
 • Works with Yoast, Rank Math, and matching Advanced Custom Fields text boxes for standfirst, excerpt, SEO, Open Graph, and keyphrase when those are the fields on screen.
-• Draft checklist flags missing or over-long title, excerpt, SEO, Open Graph, keyphrase, and a thin body. Click a gap to send a targeted prompt.
-• Quick actions for related archive images, SEO backlinks, SEO copy, and headline ideas. Headline ideas appear as buttons on the reply.
-• If you have text selected, the rewrite targets that passage. An Advanced Custom Fields block keeps its type and updates its text.
-• Sign in from the chat overlay or the toolbar popup. The default server is https://develop.content-studio.im; change it in Settings → Show advanced settings. A notification confirms a successful login.
-• The signed-in toolbar popup shows the Workspace feature buttons enabled for your assigned site (the same glyphs as the Content Studio Workspace dashboard). Click a button to open that feature in a new tab.
-• Chat replies arrive in the overlay after you send a message; you do not wait on a frozen page while the assistant works.
+• Sign in from the chat overlay or the toolbar popup. On a release WordPress site the server is https://develop.content-studio.im; on a production WordPress site it is https://content-studio.im. Choose a different host from the Server host list in Settings → Show advanced settings to override that until you change it again. A notification confirms a successful login.
+• The signed-in toolbar popup shows your name, log out, and Settings. It does not show Workspace feature buttons in this build.
+• Replies arrive in the overlay after you pick an action; you do not wait on a frozen page while the assistant works.
 • Does not save or publish. Use WordPress Undo to revert title and body. Use Save/Update in WordPress when you are ready.
 
 HOW TO USE
 1. Install this listing while signed into Chrome with your Immediate Media Google account (or an account on the allowed tester list / Google Group).
 2. Pin Content Studio and open the toolbar popup.
-3. Click **Log in** and allow access when Chrome asks (the default server is https://develop.content-studio.im). To use another host, open Settings, choose **Show advanced settings**, save the server, and allow access.
+3. Click **Log in** and allow access when Chrome asks. The server follows the WordPress site you are on (Develop on release WCP, Production on production WCP) unless you saved another host under Settings → Show advanced settings.
 4. Sign in to Content Studio, and Connect.
-5. Open a post or page in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Content Studio Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup.
-6. Ask for a change, use a quick action, or click a checklist gap. Review the draft, then save in WordPress yourself.
+5. Open a post, recipe, or list in WordPress admin on Immediate Media WCP (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`). The Content Studio Assistant appears at the bottom right. If you are not signed in, click Sign in in the overlay or Log in in the popup. Pages and other post types do not show the overlay.
+6. Choose an action (for example Headline or SEO metadata). Review the cards, Accept what you want, then save in WordPress yourself.
 
 PRIVACY
-The extension stores your server address (https://content-studio.im or https://develop.content-studio.im unless you change it to a local server), sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to that Content Studio server, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
+The extension stores your server address (https://content-studio.im or https://develop.content-studio.im unless you change it to a local server), whether you overrode the host that matches the WordPress site, a sign-in token, display name, and a numeric user id on this computer. Chat and draft snapshots are sent only to that Content Studio server, and only when you send a message. Assistant replies arrive over a realtime connection to the host that server returns at login (locally a port on that machine, otherwise a `ws.` hostname of the same server). There is no advertising or analytics SDK. See the privacy policy linked on this listing. Log out to clear the token and name from this browser.
 
 PERMISSIONS
-• “Read your browsing history” (tabs) — detect whether the current tab is Immediate Media WordPress Cloud Platform admin so the toolbar icon can show connected or disconnected, and send the current address to Content Studio so the popup can show Workspace features for the matching site. The extension does not record a history of sites you visit.
+• “Read your browsing history” (tabs) — detect whether the current tab is Immediate Media WordPress Cloud Platform admin so the toolbar icon can show connected or disconnected, and so the plugin can use Develop on release sites and Production on production sites. The extension does not record a history of sites you visit.
 • “Read and change your data on Immediate Media WordPress Cloud Platform admin” — show the overlay and update the open draft on `*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com` (and local loopback for development).
 • “Identity” — open the Content Studio sign-in window.
-• “Storage” — remember server, token, display name, user id, and realtime connection settings.
+• “Storage” — remember server, whether you overrode the auto-picked host, token, display name, user id, and realtime connection settings.
 • “Notifications” — confirm login after the sign-in window closes.
 • “Offscreen documents” — keep a quiet background page open so chat replies can arrive after you send a message.
 • Optional access to Content Studio — requested when you log in or save a host, not at install, so login, chat, and the realtime connection can reach https://content-studio.im, https://develop.content-studio.im, the matching `ws.` realtime host, or localhost (including port 8081). The extension does not request access to all websites.
@@ -83,13 +81,13 @@ This extension is for Immediate Media staff. It is not affiliated with Automatti
 SUPPORT
 Use the contact email on this listing or the Immediate Media Content Studio team.
 
-Version 0.7.1 — WordPress overlay limited to Immediate Media WCP admin hosts; optional access limited to Content Studio origins (Chrome Web Store Broad Host Permissions).
+Version 0.9.0 — Snapshot and apply follow the WordPress post type: Method Steps on Good Food recipes and editorial comments on Radio Times lists, alongside headline, standfirst, body, SEO and Open Graph.
 
 **Category** [REQUIRED]
 Productivity
 
 **Single Purpose** [REQUIRED]
-Lets a signed-in editor revise the open WordPress draft from a chat overlay (title, body, excerpt, SEO, Open Graph, and focus keyphrase) without saving or publishing.
+Lets a signed-in editor revise the open WordPress draft from an overlay (title, body, excerpt, SEO, Open Graph, and focus keyphrase) without saving or publishing.
 
 **Primary Language** [REQUIRED]
 English
@@ -112,8 +110,8 @@ English
 Take these from a real editor session after login. Chrome Web Store rejects mock device frames and misleading UI.
 
 1. Gutenberg post editor, Content Studio Assistant open, greeting plus action row visible, Immediate Media header logo showing.
-2. After a rewrite: assistant reply, draft title or body changed, Save/Update showing unsaved changes.
-3. Toolbar popup: signed-in name and user icon in the header, Workspace feature grid for the assigned site (no Log in). Crop out any secrets.
+2. After Headline or SEO: suggestion cards visible; after Accept, draft field changed and Save/Update showing unsaved changes.
+3. Toolbar popup: signed-in name and user icon in the header, Log in hidden (no Workspace feature grid). Crop out any secrets.
 
 Save files as `store-assets/screenshot-1.png` (1280×800 preferred). Do not put screenshots in the extension ZIP.
 
@@ -123,13 +121,13 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 
 | Permission | Type | Justification |
 |------------|------|---------------|
-| `tabs` | permissions | Read the current tab URL to detect Immediate Media WordPress Cloud Platform admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com` `/wp-admin/`, plus local loopback) so the toolbar icon can show a connected or disconnected status for that tab, and to send that address to Content Studio so the popup can show Workspace features for the matching assigned site. The extension does not use the history API and does not keep a log of visited sites. |
-| `storage` | permissions | Store the Content Studio server address the user saves, the sign-in token, the display name used for the chat avatar, a numeric user id used to join that user’s private chat channel, and public realtime connection settings returned at login (host, port, app key — never the server secret). Data stays in Chrome local storage on the device (not synced). |
+| `tabs` | permissions | Read the current tab URL to detect Immediate Media WordPress Cloud Platform admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com` `/wp-admin/`, plus local loopback) so the toolbar icon can show a connected or disconnected status for that tab, and so login and chat can use Develop on release WCP and Production on production WCP unless the user saved a different server. The extension does not use the history API and does not keep a log of visited sites. |
+| `storage` | permissions | Store the Content Studio server address (matched from the WordPress site, or overridden in Settings), whether the user overrode that match, the sign-in token, the display name used for the chat avatar, a numeric user id used to join that user’s private chat channel, and public realtime connection settings returned at login (host, port, app key — never the server secret). Data stays in Chrome local storage on the device (not synced). |
 | `identity` | permissions | Open the Content Studio sign-in window and return the authorization redirect to the extension so staff can connect their account. This is not Google account sign-in. |
 | `notifications` | permissions | Show a “Successfully logged in” notification after the sign-in window closes, because the toolbar popup is already gone. Clicking the notification reopens the popup. |
 | `offscreen` | permissions | Keep a background page open with a realtime connection to Content Studio so assistant replies can arrive after the toolbar service has gone idle. The page has no UI and does not read WordPress. |
 | `https://*.production.wcp.imdserve.com/wp-admin/*` and `https://*.release.wcp.imdserve.com/wp-admin/*` | content_scripts.matches | Run on Immediate Media WordPress Cloud Platform admin so the overlay can read the open draft and apply the user’s requested edits. Brand sites are subdomains of those two WCP hosts, not arbitrary websites. Loopback `/wp-admin/` is included only for local development. This is not listed under `host_permissions` because Chrome ignores the path on that key. The extension does not save or publish. `activeTab` cannot replace this: it only grants access after an action-icon click, and the overlay must appear when the editor page loads. |
-| `https://content-studio.im/*`, `https://develop.content-studio.im/*`, `https://ws.content-studio.im/*`, `https://ws.develop.content-studio.im/*`, and localhost (including ports 8080 and 8081) | optional_host_permissions | Not granted at install. When the user clicks Log in or Save host, Chrome prompts only for the chosen Content Studio origin and its matching realtime origin (`https://ws.develop.content-studio.im` or `https://ws.content-studio.im`, or `http://localhost:8081/*` on loopback). After login, Echo connects to the `broadcasting.host` returned by Content Studio. The grant is so login, profile, Workspace catalog, logout, chat kick-off, channel authorization, and replies can reach those hosts. The extension does not request `http://*/*`, `https://*/*`, or `<all_urls>`. |
+| `https://content-studio.im/*`, `https://develop.content-studio.im/*`, `https://ws.content-studio.im/*`, `https://ws.develop.content-studio.im/*`, and localhost (including ports 8080 and 8081) | optional_host_permissions | Not granted at install. When the user clicks Log in or Save host, Chrome prompts only for the chosen Content Studio origin and its matching realtime origin (`https://ws.develop.content-studio.im` or `https://ws.content-studio.im`, or `http://localhost:8081/*` on loopback). After login, Echo connects to the `broadcasting.host` returned by Content Studio. The grant is so login, profile, logout, chat kick-off, channel authorization, and replies can reach those hosts. The extension does not request `http://*/*`, `https://*/*`, or `<all_urls>`. |
 
 ## Privacy & Data Use
 
@@ -145,7 +143,7 @@ Paste these into the Privacy tab. Every line is a user-facing reason, not “nee
 | Authentication info | Yes | Yes — authorization code exchange and bearer token to the configured host; token stored locally | Sign in, stay signed in, sign out | No, other than the user’s Content Studio server |
 | Personal communications | Yes | Yes — chat message, recent overlay transcript, and assistant replies via the configured host (HTTP kick-off plus a realtime connection for the reply) | Generate revision suggestions | No, other than the user’s Content Studio server (which may call Immediate Media’s AI providers) |
 | Location | No | No | — | — |
-| Web history | No | No | Tab URL is read to detect Immediate Media WCP wp-admin for the toolbar light and, when signed in, sent to Content Studio to choose the Workspace site; not stored as history | — |
+| Web history | No | No | Tab URL is read to detect Immediate Media WCP wp-admin for the toolbar light; not stored as history | — |
 | User activity | Yes | Yes — sending a chat turn, plus OS, browser, and extension version | Operate the revision assistant and record which client sent the turn | No, other than the user’s Content Studio server |
 | Website content | Yes | Yes — draft snapshot (title, body, excerpt, SEO/OG text, keyphrase, selection) when the user sends a message | Ground replies and apply edits to the open editor | No, other than the user’s Content Studio server |
 
@@ -206,16 +204,16 @@ Paste into the Test instructions tab. Replace the bracketed staging values befor
 This item is a private Immediate Media staff tool. It is not meant for the public Chrome Web Store.
 
 What it does
-Opens a chat overlay on Immediate Media WordPress Cloud Platform post/page editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`, post.php / post-new.php). After Content Studio login, the user can ask for copy changes. Suggested title, body, selection, excerpt, SEO, Open Graph, and focus keyphrase are written into the open draft. It does not save or publish.
+Opens a Content Studio Assistant overlay on Immediate Media WordPress Cloud Platform post, recipe, and list editors (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`, post.php / post-new.php). After Content Studio login, the editor picks an action (Internal links, Headline, Standfirst, SEO metadata). Headline, standfirst, and SEO suggestions are reviewable cards; Accept writes that field into the open draft. It does not save or publish.
 
 How to install
 Load the uploaded package. Pin the toolbar icon.
 
 How to configure
-1. Open the popup. The default server is https://develop.content-studio.im (Settings → Show advanced settings to change it).
+1. Open the popup. Server host follows the WordPress tab (Develop on `*.release.wcp.imdserve.com`, Production on `*.production.wcp.imdserve.com`; Settings → Show advanced settings → Server host to override).
 2. Click Log in and allow the origin (and a second realtime origin if Chrome asks: `ws.` plus the hostname, or local port 8081) when Chrome prompts.
 3. Sign in → Connect.
-4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay chat (greeting, checklist, composer) appears on an editor tab. Signed-out overlay hides the chat and shows Sign in.
+4. Expected: Chrome notification “Successfully logged in as …”, popup reopens, overlay (greeting and action row) appears on an editor tab. Signed-out overlay hides the actions and shows Sign in.
 
 WordPress
 Open [STAGING WP ADMIN on *.production.wcp.imdserve.com or *.release.wcp.imdserve.com] → Posts → Edit a draft (Gutenberg or Classic). The Content Studio Assistant should appear bottom-right.
@@ -226,19 +224,21 @@ Password: [THROWAY PASSWORD]
 Use only this account. Do not publish the test post.
 
 Try
-• Send “Tighten the title”.
+• Click Headline. Wait for suggestion cards. Accept one.
 • Confirm the editor title changes and Save/Update shows unsaved changes.
-• WordPress Undo should revert the title.
+• Undo on the card should restore the previous title. WordPress Undo should also revert the title.
 • Click the user icon in the popup header to log out; overlay hides the chat and shows Sign in.
 
 If you have no WordPress or Content Studio access
-The popup still opens. Log in prompts for access to https://develop.content-studio.im (or https://content-studio.im / localhost saved in Settings). Content scripts only match Immediate Media WCP admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) and local loopback.
+The popup still opens. Log in prompts for access to the Content Studio host that matches the WordPress tab (https://develop.content-studio.im on release WCP, https://content-studio.im on production WCP) or a host saved in Settings. Content scripts only match Immediate Media WCP admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) and local loopback.
 ```
 
 ## Version History
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 0.9.0 | 2026-09-10 | Snapshot and apply follow the WordPress `post_type`. `sxs-recipe` also reads and writes Method Steps (Good Food ACF flexible `field_sxs-method-recipe-flex`); `list` also reads and writes list item editorial comments (Radio Times ACF flexible `field_acf_bs_show_listmeta-list_items`). **Internal links** applies to those fields on those post types. Overlay buttons and permissions are unchanged. | Draft |
+| 0.8.0 | 2026-09-09 | Action-led overlay: Internal links, Headline, Standfirst and SEO metadata as reviewable cards (Accept / Regenerate / Reject / Undo). Workspace feature grid and free-text chat hidden for the beta. Regenerating a card stays on that card. Popup host is a Production / Develop / Local dropdown. Default server remains Develop (`https://develop.content-studio.im`). | Released |
 | 0.7.1 | 2026-08-26 | Content scripts and overlay assets limited to Immediate Media WCP admin (`*.production.wcp.imdserve.com`, `*.release.wcp.imdserve.com`) and loopback. Optional hosts limited to Content Studio and realtime origins (no `http://*/*` / `https://*/*`) to clear Chrome Web Store Broad Host Permissions. Classic Editor **Add Footers** control stays in the media-button row but is hidden. Default Content Studio host is `https://develop.content-studio.im`. Public privacy policy at `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy`. | Draft |
 | 0.7.0 | 2026-08-20 | Signed-in toolbar popup shows Workspace feature buttons for the user’s assigned site (`GET /api/plugin/workspace`), using the same glyphs as the Workspace dashboard. Clicking a button opens `/workspace/{siteId}?feature={key}`. | Draft |
 | 0.6.0 | 2026-08-19 | Chat replies arrive over a realtime connection. Echo uses `broadcasting.host` from login (`POST /api/plugin/token`); Save host also requests a matching realtime origin (`localhost:8081` or `ws.{saved hostname}`). | Draft |
@@ -250,10 +250,10 @@ The popup still opens. Log in prompts for access to https://develop.content-stud
 
 - Reviewers cannot fully test chat apply without a WordPress admin on Immediate Media WCP and a Content Studio host. Supply staging credentials if possible.
 - After the store assigns an item ID, Content Studio must allow `https://<ITEM_ID>.chromiumapp.org/` or login from the store build fails while unpacked-dev login still works.
-- `optional_host_permissions` are the Content Studio origins and matching realtime hosts, not `http://*/*` / `https://*/*`. Install does not grant them; Log in or Save host requests the API origin and a guessed realtime origin (`localhost:8081`, `ws.develop.content-studio.im`, or `ws.content-studio.im`) that must match `broadcasting.host` from login. New installs default the API origin to `https://develop.content-studio.im`.
+- `optional_host_permissions` are the Content Studio origins and matching realtime hosts, not `http://*/*` / `https://*/*`. Install does not grant them; Log in or Save host requests the API origin and a guessed realtime origin (`localhost:8081`, `ws.develop.content-studio.im`, or `ws.content-studio.im`) that must match `broadcasting.host` from login. With no override, release WCP uses `https://develop.content-studio.im` and production WCP uses `https://content-studio.im`.
 - Content scripts match Immediate Media WCP admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) plus loopback. That pattern is not also in `host_permissions` (Chrome ignores the path on that key). Chat still requires a granted Content Studio host and a valid token before anything is sent.
 - `activeTab` is not used. It only grants access after an explicit action-icon click (or equivalent gesture) and would not inject the overlay when an editor tab loads.
-- The overlay does not appear on WordPress.com Calypso or on WordPress admin hosts outside WCP / loopback.
+- The overlay does not appear on WordPress.com Calypso, on WordPress admin hosts outside WCP / loopback, or on post types other than `post`, `sxs-recipe`, and `list`.
 - Store icon is the Immediate Media IM circle on a black square (`icons/icon-128.png`).
 
 ### Laravel / identity checklist after first upload
@@ -261,7 +261,7 @@ The popup still opens. Log in prompts for access to https://develop.content-stud
 1. Copy Item ID from the dashboard.
 2. Confirm `chrome.identity.getRedirectURL()` for the store build is `https://<ITEM_ID>.chromiumapp.org/`.
 3. Add that URI to the Content Studio plugin OAuth client (`content-studio-plugin`), alongside the unpacked-dev URI.
-4. Install from the listing on a clean Chrome profile, log in (default host `https://develop.content-studio.im`, or save another host in Settings), and confirm once before inviting the rest of the team.
+4. Install from the listing on a clean Chrome profile, log in (host follows the WordPress tab, or save another host in Settings), and confirm once before inviting the rest of the team.
 
 ### Rejection History
 

@@ -101,20 +101,12 @@
             <h3 id="host-heading">Server host</h3>
             <form id="cex-host-form">
               <label for="cex-host">Server</label>
-              <span id="cex-host-hint" class="hint">https://content-studio.im, https://develop.content-studio.im, or http://localhost</span>
-              <input
-                id="cex-host"
-                name="host"
-                type="url"
-                inputmode="url"
-                autocomplete="url"
-                enterkeyhint="done"
-                placeholder="https://develop.content-studio.im"
-                required
-                aria-describedby="cex-host-hint"
-                aria-errormessage="cex-host-error"
-              >
-              <span id="cex-host-error" class="error-msg">Use https://content-studio.im, https://develop.content-studio.im, or http://localhost.</span>
+              <select id="cex-host" name="host" autocomplete="off" required>
+                <option value="https://content-studio.im">Production (content-studio.im)</option>
+                <option value="https://develop.content-studio.im" selected>Develop (develop.content-studio.im)</option>
+                <option value="http://localhost">Local (localhost)</option>
+              </select>
+              <p id="cex-host-hint" class="host-hint" hidden></p>
               <button type="submit" id="cex-save-host">Save host</button>
             </form>
           </section>

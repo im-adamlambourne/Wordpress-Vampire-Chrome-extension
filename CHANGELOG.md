@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GitHub releases are cut automatically from `manifest.json`. `.github/workflows/release.yml` watches `manifest.json` on `main` (the release branch); when the version changes it tags `v{version}`, uses that version's `CHANGELOG.md` section as the release notes (via `scripts/release-notes.sh`), and attaches the `scripts/package-cws.sh` ZIP. A version that is already released is a no-op, and a missing changelog section fails the run rather than publishing empty notes.
+
+### Changed
+
+- The plugin picks a Content Studio host from the WordPress tab unless you override it in Settings: `*.release.wcp.imdserve.com` uses Develop, `*.production.wcp.imdserve.com` uses Production, and loopback still uses Develop. Saving or logging in with a different Server host remembers that choice until you save again. Saving the host that matches this WordPress tab turns auto-matching back on.
+- The assistant overlay only mounts on `post`, `sxs-recipe`, and `list` editors. Pages and other post types still attach for session debug, but the chat shell stays off.
+
+## [0.9.0] - 2026-09-10
+
+### Added
+
+- Snapshot and apply follow the WordPress `post_type`. `post` keeps today's fields (headline, body, standfirst/Description, Open Graph, SEO, focus keyphrase). `sxs-recipe` also reads and writes **Method Steps** (Good Food ACF flexible `field_sxs-method-recipe-flex`). `list` also reads and writes **list item editorial comments** (Radio Times ACF flexible `field_acf_bs_show_listmeta-list_items`, `broadcast_shows_content` comments only). Method-step rewrites apply immediately, like body. Overlay action buttons are unchanged.
+
+### Changed
+
+- On `sxs-recipe`, **Internal links** apply to Method Steps. Accept wraps the first unlinked occurrence in a step instruction (not a heading, not Classic `#content`) and writes `method_steps`.
+- On `list`, **Internal links** apply to list item editorial comments (not the "RT says:" heading, not the show picker, not Classic `#content`). Accept wraps the first unlinked occurrence and writes `list_items`.
+
+### Fixed
+
+- Accepting an **Internal links** card on a recipe now updates the Method Steps on screen. Apply was writing the hidden textarea and reporting success while TinyMCE still showed the old step; it now writes the visual editor in place (and does the same for list item comments).
+- Accepting a suggestion card no longer fails with "Could not update the editor". The MAIN-world bridge called `normaliseMethodSteps` on every apply, but that helper lived in a separate content-script file whose functions are not in scope there. Helpers now install on `globalThis`, and apply still writes title/excerpt/SEO if they are missing.
+- Recipe **Internal links** Accept now writes Method Steps when the MAIN-world allow-list helpers are missing. Snapshot and apply treated that as "not a recipe" (`method_steps: []`), so cards could still wrap the isolated DOM fallback while the bridge skipped the TinyMCE write. The bridge now falls back to `sxs-recipe` / `list` locally, and still reads/writes when the ACF flex field is on the page.
+
+## [0.8.0] - 2026-09-09
+
+### Added
+
 - Overlay action buttons for **Internal links**, **Headline**, **Standfirst** and **SEO metadata**. **First sub** and **Footers** are shown with a SOON pill and are not usable yet.
 - Replies come back as reviewable suggestion cards. **Accept** writes only that field into the draft, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** / **Reconsider** put it back. A headline reply becomes one card per alternative rather than a pick-one list, so every suggestion carries the same three buttons. A field holds one value, so accepting a second headline returns the first card to pending and leaves **Undo** pointing at the headline the draft had before any of them. A regenerate is deliberately quiet — no bubble either way — so the card reports it: *Regenerating…* while the request is out, *Regenerated* when the new value lands, and *Nothing new came back* when the reply did not carry that field.
 - Editor bridge accepts an opt-in `clear` list (title, excerpt, SEO, Open Graph, focus keyphrase) so **Undo** can restore a field that was blank before the suggestion was accepted. Body and selection are never cleared.
@@ -19,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Local Sail testing of chat now needs the Horizon `plugin` queue (`php artisan horizon`, or `queue:work --queue=plugin`), not `generative`.
+- The overlay action buttons sit in a two-column grid so long labels no longer leave a ragged last row.
+- The signed-in toolbar popup no longer shows the Workspace feature grid. Sign-in, the header account control, and Settings stay; the catalog fetch, grid, and Settings site picker remain behind `SHOW_WORKSPACE_GRID` in `popup/popup.js`.
+- A regenerating suggestion card shows the overlay spinner next to *Regenerating…*.
+- Settings **Server host** is a dropdown of Production, Develop, and Local (`localhost`) instead of a typed URL.
 - Overlay is named **Content Studio Assistant** (was Revision Assistant), and the welcome copy points at the action buttons.
 - SEO, Open Graph, excerpt, focus keyphrase and headline replies are no longer written straight into the draft — they wait on a card until accepted. Body and selection rewrites still apply as soon as the reply lands.
 - Internal links keeps its existing behaviour (reply plus the body edit) until `POST /api/plugin/chat` returns a `suggestions` array. Once it does, the overlay renders link cards and inserts the anchor itself.
@@ -34,7 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Chat requests no longer hand the agent the same instruction twice. `history` was sliced from the transcript *after* the new prompt had been pushed onto it, so every request carried the prompt both as the last history turn and as `message`. Single-field prompts suffer most — a repeated instruction invites an acknowledgement instead of an answer, which is why **Regenerate** so often came back with nothing usable. `history` is now the turns before this one, which is what `docs/plugin-chat-api.md` already described.
 - An empty reply no longer renders an empty bubble. `reply` is normalised to `''` when the assistant sends none, and the overlay appended it regardless, so "answered with nothing" looked exactly like "never answered". A reply with nothing to show now says so, and the bubble is skipped altogether when the cards or the applied-edit status are the answer.
-- **Internal links** produces cards again. The action's prompt asks the agent not to touch the body, so it answers with a bullet list instead of a body rewrite — and Content Studio does not send `suggestions` yet, which left the reply as unusable prose. Those bullets are now read into link cards (`parseLinkSuggestionsFromReply`), preferring the anchor alternative that actually appears in the draft, and the bullet list is stripped from the reply bubble. This is interim: `normaliseReply()` still prefers a real `suggestions` array, and the parser can be deleted once the API sends one.
+- **Internal links** produces cards again. The action's prompt asks the agent not to touch the body, so it answers with a bullet list instead of a body rewrite — and Content Studio does not send `suggestions` yet, which left the reply as unusable prose. Those bullets are now read into link cards (`parseLinkSuggestionsFromReply`), preferring the anchor alternative that is actually linkable in the draft, and the bullet list is stripped from the reply bubble. This is interim: `normaliseReply()` still prefers a real `suggestions` array, and the parser can be deleted once the API sends one.
+- **Headline** produces cards again on **Regenerate**. The agent often lists alternatives as a numbered list in `reply` and leaves `title_variants` empty, which left the quiet swap with nothing to put in the card. Those lines are now read into title cards (`parseHeadlineVariantsFromReply`), the same interim approach as internal-link bullets. Content Studio also recovers `title_variants` from that list when the array is empty.
 - Standfirst, SEO metadata and focus keyphrase now reach Immediate WCP article fields. ACF semantics were matched by exact field name or exact label only, so `im-wp-core-description` (labelled "Description") matched neither and the standfirst was written to the hidden native excerpt box instead of the visible **Description** field — reporting success while nothing changed on screen. The snapshot could not read it either, so the assistant never saw the existing standfirst. `im_seo-main-keyword-phrase` was unmatched for the same reason. Matching is now three passes over a most-specific-first order (exact name, then label, then trailing name segment), which also keeps the three rival "Description" fields — standfirst, Open Graph and SEO meta — from claiming each other.
 - Chat requests no longer carry a stale `action` id. `state.activeAction` was only ever set, never cleared, so a free-text message or a draft-checklist prompt reported whichever action button ran last. Both surfaces are behind flags today, but the id is exactly what Content Studio is meant to branch on. Regenerate now passes the action explicitly.
 - Accepting an internal link no longer targets headings, captions, pull quotes or code blocks. The first match in the document was winning even when it was an `<h2>`, which is not where a link belongs; an anchor found only in those places is refused instead.

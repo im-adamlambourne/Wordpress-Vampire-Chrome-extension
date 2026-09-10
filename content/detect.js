@@ -41,7 +41,13 @@ function detectPostId() {
 function detectPostType() {
   const fromInput = valueOf('#post_type') || valueOf('input[name="post_type"]');
   if (fromInput) return fromInput;
-  return new URLSearchParams(location.search).get('post_type') || '';
+  const fromQuery = new URLSearchParams(location.search).get('post_type');
+  if (fromQuery) return fromQuery;
+  if (typeof postTypeFromWpBody === 'function') {
+    return postTypeFromWpBody(document.body);
+  }
+  const match = String(document.body?.className || '').match(/\bpost-type-([a-z0-9_-]+)\b/i);
+  return match ? match[1] : '';
 }
 
 function detectTitle() {
@@ -220,16 +226,104 @@ function acfDomValue(el, type) {
 }
 
 function detectArticleSnapshot() {
-  return {
+  const postType = detectPostType();
+  const snapshot = {
     title: detectTitle(),
     content: detectContent(),
     excerpt: detectExcerpt(),
     ...detectSeoSnapshot(),
     editor_type: detectEditorType() || '',
     post_id: detectPostId(),
-    post_type: detectPostType(),
+    post_type: postType,
     url: location.href,
   };
+  if (postTypeAllowsMethodSteps(postType)) {
+    snapshot.method_steps = detectMethodSteps();
+  }
+  if (postTypeAllowsListItems(postType)) {
+    snapshot.list_items = detectListItems();
+  }
+  return snapshot;
+}
+
+const METHOD_FLEX_KEY = 'field_sxs-method-recipe-flex';
+const METHOD_STEP_KEY = 'field_sxs-method-recipe-step';
+const METHOD_HEADING_LAYOUT = 'sxs-method-recipe-heading';
+const METHOD_STEP_LAYOUT = 'sxs-method-recipe-step';
+const LIST_FLEX_KEY = 'field_acf_bs_show_listmeta-list_items';
+const LIST_COMMENT_KEY = 'field_acf_bs_show_listmeta-list_items-broadcast_content-editorial_comment';
+
+function detectMethodSteps() {
+  const root = document.querySelector(`.acf-field[data-key="${METHOD_FLEX_KEY}"]`);
+  if (!root) return [];
+
+  const rows = [];
+  for (const layout of methodLayouts(root)) {
+    const kind = methodLayoutKind(layout);
+    if (!kind) continue;
+    const text = methodLayoutText(layout, kind);
+    rows.push({ kind, text });
+  }
+  return normaliseMethodSteps(rows);
+}
+
+function methodLayouts(root) {
+  const real = (els) => [...els].filter((el) => (
+    !el.classList.contains('acf-clone')
+    && el.getAttribute('data-id') !== 'acfcloneindex'
+  ));
+  const preferred = real(root.querySelectorAll('.values > .layout'));
+  if (preferred.length > 0) return preferred;
+  return real(root.querySelectorAll('.layout[data-id], .acf-row[data-id]'));
+}
+
+function methodLayoutKind(layout) {
+  const name = String(layout.getAttribute('data-layout') || '');
+  if (name === METHOD_HEADING_LAYOUT || name.endsWith('-heading')) return 'heading';
+  if (name === METHOD_STEP_LAYOUT || name.endsWith('-step')) return 'step';
+  if (layout.querySelector(`.acf-field[data-key="${METHOD_STEP_KEY}"]`)) return 'step';
+  return '';
+}
+
+function methodLayoutText(layout, kind) {
+  if (kind === 'step') {
+    const textarea = layout.querySelector(
+      `textarea[name*="[${METHOD_STEP_KEY}]"], textarea[name*="${METHOD_STEP_KEY}"]`,
+    );
+    if (textarea && typeof textarea.value === 'string') return textarea.value.trim();
+  }
+  const named = layout.querySelector(
+    'input[type="text"][name*="heading"], textarea[name*="heading"]',
+  );
+  if (named && typeof named.value === 'string' && named.value.trim()) return named.value.trim();
+  const input = layout.querySelector('input[type="text"]:not([type="hidden"]), textarea');
+  return input && typeof input.value === 'string' ? input.value.trim() : '';
+}
+
+function detectListItems() {
+  const root = document.querySelector(`.acf-field[data-key="${LIST_FLEX_KEY}"]`);
+  if (!root) return [];
+
+  const preferred = [...root.querySelectorAll('.values > .layout')];
+  const rows = preferred.length > 0
+    ? preferred
+    : [...root.querySelectorAll('.layout[data-id], .acf-row[data-id]')];
+
+  const items = [];
+  for (const layout of rows) {
+    if (layout.classList.contains('acf-clone') || layout.getAttribute('data-id') === 'acfcloneindex') {
+      continue;
+    }
+    const textarea = layout.querySelector(
+      `textarea[name*="[${LIST_COMMENT_KEY}]"], textarea[name*="${LIST_COMMENT_KEY}"]`,
+    );
+    if (!textarea) continue;
+    items.push({
+      kind: 'item',
+      text: typeof textarea.value === 'string' ? textarea.value.trim() : '',
+    });
+  }
+  return normaliseListItems(items);
 }
 
 function detectRestRoot() {

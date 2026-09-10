@@ -1,0 +1,74 @@
+name: Release
+
+# Cuts a GitHub release tagged to the manifest version whenever that version changes on
+# main, the release branch. manifest.json is the single source of truth: bump it (and move
+# [Unreleased] into a matching CHANGELOG.md heading), merge to main, and the tag, notes and
+# CWS ZIP follow. Day-to-day work still merges into develop; main moves when you release.
+# Re-runnable by hand from the Actions tab; a version that is already released is a no-op.
+
+on:
+  push:
+    branches: [main]
+    paths: ['manifest.json']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read manifest version
+        id: manifest
+        run: |
+          version="$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")"
+          echo "Manifest version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Skip versions that are already released
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.manifest.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already released — nothing to do."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$TAG is not released yet."
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fails the job when CHANGELOG.md has no section for this version, so a release is
+      # never published with empty notes.
+      - name: Release notes from CHANGELOG.md
+        if: steps.check.outputs.needed == 'true'
+        env:
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: ./scripts/release-notes.sh "$VERSION" | tee release-notes.md
+
+      - name: Package for the Chrome Web Store
+        if: steps.check.outputs.needed == 'true'
+        run: ./scripts/package-cws.sh
+
+      - name: Create release
+        if: steps.check.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+          TAG: ${{ steps.manifest.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Content Studio $TAG" \
+            --notes-file release-notes.md \
+            "dist/content-studio-plugin-v${VERSION}.zip"
+          echo "Released $TAG" >> "$GITHUB_STEP_SUMMARY"

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Content Studio",
-  "version": "0.7.1",
-  "description": "Revise WordPress drafts from a chat overlay, and open your Content Studio Workspace features from the toolbar.",
+  "version": "0.9.0",
+  "description": "Revise WordPress drafts from a chat overlay. Sign in from the toolbar popup.",
   "permissions": ["tabs", "storage", "identity", "notifications", "offscreen"],
   "optional_host_permissions": [
     "https://content-studio.im/*",
@@ -42,7 +42,7 @@
         "http://localhost/wp-admin/*",
         "http://127.0.0.1/wp-admin/*"
       ],
-      "js": ["content/detect.js", "content/chat-modal.js"],
+      "js": ["content/post-type-fields.js", "content/detect.js", "content/chat-modal.js"],
       "run_at": "document_idle"
     },
     {
@@ -52,7 +52,7 @@
         "http://localhost/wp-admin/*",
         "http://127.0.0.1/wp-admin/*"
       ],
-      "js": ["content/editor-bridge.js"],
+      "js": ["content/post-type-fields.js", "content/editor-bridge.js"],
       "run_at": "document_idle",
       "world": "MAIN"
     }
