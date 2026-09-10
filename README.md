@@ -1,90 +1,107 @@
-# Content Studio
+# Content Studio Chrome Plugin
 
-Chrome extension (Manifest V3) that attaches to Immediate Media WordPress Cloud Platform admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com` `/wp-admin/`) and signs in so later API calls can run as the signed-in user.
+**Codename:** Vampire · **Version:** 0.9.0 · **Status:** Beta
 
-Immediate Media branded. Targets Gutenberg and Classic. Not WordPress.com Calypso.
+<p>
+  <img src="icons/icon-128.png" width="96" height="96" alt="Content Studio">
+</p>
 
-The Laravel endpoints live in `content-exchange-v2` — see
-`core/docs/Content-Studio-Plugin-Auth.md` (login, 202 chat kick-off, Reverb events).
+A Manifest V3 Chrome extension for Immediate Media editorial teams. It sits on the WordPress draft you already have open and lets Content Studio suggest headlines, standfirsts, SEO copy, and internal links — reviewed by you before anything is written into the post.
 
-Release history is in [`CHANGELOG.md`](CHANGELOG.md).
+It attaches to Immediate Media WordPress Cloud Platform admin (`*.production.wcp.imdserve.com` and `*.release.wcp.imdserve.com`) and local loopback. Gutenberg and Classic are both supported. It is not for WordPress.com.
 
-## Load unpacked
+## What it does
 
-1. `chrome://extensions` → Developer mode → Load unpacked → this repo root.
-2. Reload the extension after code changes. Reload the WordPress tab so content scripts reinject. The overlay only injects on Immediate Media WCP admin (`*.production.wcp.imdserve.com` or `*.release.wcp.imdserve.com`) and `http://localhost` / `http://127.0.0.1`.
+On a supported editor, **Content Studio Assistant** appears in the bottom-right of the page. Pick an action; the assistant reads the open draft, talks to Content Studio, and returns suggestions as cards.
 
-## Login
+| Action | Today |
+| --- | --- |
+| Internal links | Ready |
+| Headline | Ready |
+| Standfirst | Ready |
+| SEO metadata | Ready |
+| First sub | Coming soon |
+| Footers | Coming soon |
 
-The popup (toolbar icon) is the sign-in screen. After you sign in it shows your name in the header next to a user icon and Settings. The Workspace feature grid is hidden for the beta behind `SHOW_WORKSPACE_GRID` in `popup/popup.js`. Open **Settings** (cog) → **Show advanced settings** for the Laravel **Server host** dropdown and the WordPress session dump. Click the user icon to log out.
+Each suggestion can be **accepted**, **regenerated**, **rejected**, or **undone**. Accepting writes only that field into the draft (including matching ACF standfirst and SEO boxes when those are the fields on screen). Body, method-step, and list-item rewrites still apply as soon as they arrive. The plugin never saves or publishes — use WordPress Save/Update when you are ready, and WordPress Undo to revert title and body.
 
-1. Open the popup and click **Log in**. The Server host follows the WordPress tab you are on (`*.release.wcp.imdserve.com` → `https://develop.content-studio.im`, `*.production.wcp.imdserve.com` → `https://content-studio.im`, loopback → Develop) unless you have saved a different origin under **Settings** → **Show advanced settings**. Allow the API origin and the realtime origin when Chrome asks (`https://ws.develop.content-studio.im` for Develop, `https://ws.content-studio.im` for production, or `http://localhost:8081` for a local server). Echo itself does not use that guess — after login it uses `broadcasting.host` from `POST /api/plugin/token` (Laravel derives the same `localhost:8081` / `ws.{API host}` unless `PLUGIN_REVERB_*` overrides it).
-2. To point at a Sail app instead, open **Settings** → **Show advanced settings**, choose **Local (localhost)**, **Save host**, and allow access. Start Reverb locally with `docker compose exec laravel.test php artisan reverb:start` (host port **8081**) and a `plugin` worker (`docker compose exec laravel.test php artisan horizon`, or `queue:work --queue=plugin`). With `QUEUE_CONNECTION=sync`, chat POST waits on Flash instead of returning 202 immediately.
-3. After **Log in** (popup) or **Sign in** (editor overlay), Chrome opens the sign-in window. Sign in if needed (`admin@immediate.co.uk` / `password123` locally), then **Connect**. Sessions saved before 0.6.0 must log in again. Overlay **Sign in** uses the host for that WordPress tab (or the host you saved); if Chrome has not granted that origin yet, it opens the toolbar popup so **Log in** can request access.
-4. The popup closes during the bounce. A Chrome notification should confirm the login, and the plugin popup should reopen with **Successfully logged in as {name}**. Clicking the notification also opens the popup. The signed-in popup is a compact account shell (name, log out, Settings) — it does not load Workspace feature buttons while `SHOW_WORKSPACE_GRID` is false.
-5. If the WordPress editor is already open while signed out, the overlay hides the greeting and action row and shows **Sign in** instead. Click it to start the same identity bounce (the host is the one matched from this WordPress site, or the origin you saved). The assistant returns as soon as the token is stored (no tab reload required). The overlay uses Immediate Media blue with the IM circle next to **Content Studio Assistant** and a **Beta** pill, plus the rolling-dot thinking loader and a short reply sound. The greeting uses the signed-in first name and points at the action row: **Internal links**, **Headline**, **Standfirst** and **SEO metadata**, with **First sub** and **Footers** shown as coming soon. There is no free-text chat box during the beta — it is hidden behind `SHOW_FREE_CHAT` in `content/chat-modal.js`, along with the draft checklist behind `SHOW_DRAFT_CHECKLIST`, and both come back by flipping the flag. Picking an action kicks off `POST /api/plugin/chat` (202) and the reply arrives over Reverb (Gemini 3.7 Flash). Suggestions land as cards you review one at a time: **Accept** writes just that field into the open Gutenberg or Classic editor (Yoast and Rank Math when those plugins are present; matching ACF standfirst/SEO text fields when the site uses Advanced Custom Fields for those boxes) and marks the draft unsaved so Save/Update and the leave-page warning work, **Regenerate** asks for a different value, **Reject** dismisses it, and **Undo** puts the field back to what it was. A headline reply arrives as one card per alternative, and accepting a second replaces the first. Internal links currently still insert into the body in one go; they become reviewable link cards once Content Studio returns a `suggestions` array. On a Good Food Classic recipe (`sxs-recipe`) the snapshot also includes Method Steps; a method rewrite applies as soon as it lands (like body), without a new overlay button, and **Internal links** wrap an occurrence in a method step rather than Classic `#content`. On a Radio Times Classic `list` the snapshot also includes list item editorial comments; **Internal links** wrap an occurrence in a comment rather than Classic `#content` (the show picker and "RT says:" heading stay untouched). The overlay does not appear on `page` or other unsupported post types. It does not save or publish; use WordPress Undo to revert title/body. If the WordPress host matches one of the signed-in user's Content Exchange sites, that site's house style is injected into the chat and archive image/backlink search is scoped to that site. If the host does not match and the user has exactly one assigned site, that site's guide is used instead.
+**Supported post types:** `post`, `sxs-recipe` (including Method Steps), and `list` (including list-item editorial comments). Other types, including `page`, do not show the assistant.
 
-The host is stored in `chrome.storage.local` so you can point at local, develop, or production Content Studio without rebuilding. **Server host** in Settings is a dropdown of those origins (Production, Develop, Local). Opening the popup on a WCP editor pre-selects Develop on release sites and Production on production sites; loopback stays on Develop. Saving a different origin (or logging in with one) sets an override that lasts until you save again. Saving the origin that matches this WordPress tab clears the override. Changing host clears the stored token, display name, user id, and realtime settings.
+On a Good Food recipe, **Internal links** wrap an occurrence in a Method Step. On a Radio Times list, they wrap an occurrence in an editorial comment. On a standard post they wrap body copy. Headings, captions, and similar chrome are left alone.
 
-WordPress session debug is in **Settings** → **Show advanced settings**, below the host dropdown. It is not the plugin account name.
+## Getting started
 
-## How auth works
+### Staff
 
-```
-Save host or Log in
-  → chrome.permissions.request for the API origin and a guessed Reverb origin
-    (localhost:8081, or https://ws.content-studio.im / https://ws.develop.content-studio.im)
-Log in (popup or overlay Sign in)
-  → service worker chrome.identity.launchWebAuthFlow
-  → GET {host}/plugin/authorize (PKCE)
-  → Fortify login / 2FA / Connect
-  → redirect https://<extension-id>.chromiumapp.org/?code=
-  → POST {host}/api/plugin/token
-  → store Sanctum token, display name, user id, and broadcasting { key, host, port, scheme }
-  → offscreen Echo connects to broadcasting.host (not a client-invented URL)
-  → subscribe to private-plugin.{userId} via POST {host}/broadcasting/auth
-  → Chrome notification “Successfully logged in…”
-  → reopen plugin popup with the same success message
-Reopen popup
-  → GET {host}/api/plugin/me  Authorization: Bearer (session check)
-  → show name in the header (user icon logs out)
-  → GET {host}/api/plugin/workspace?url={active tab}  Authorization: Bearer
-     (only when SHOW_WORKSPACE_GRID is true)
-  → feature grid for the matched site, otherwise Radio Times if assigned
+Install from Immediate Media’s **private** Chrome Web Store listing (not public search). Sign into Chrome with your work account, pin **Content Studio**, then sign in as below.
 
-Editor chat (signed in)
-  → content/chat-modal.js asks content/editor-bridge.js (MAIN world) for a snapshot
-  → PLUGIN_CHAT
-  → service worker POST {host}/api/plugin/chat (message, draft snapshot, telemetry) → 202 request_id
-  → Laravel ProcessPluginChatJob on the plugin queue
-  → Reverb PluginChatReplied / PluginChatFailed
-  → offscreen Echo → PLUGIN_CHAT_RESULT → overlay (reply sound)
-  → non-empty edits applied via the MAIN-world bridge (Gutenberg wp.data, Classic/TinyMCE, Yoast/Rank Math, and matching ACF fields)
-```
+Store listing copy, distribution, and packaging live in [`CHROMEWEBSTORE.md`](CHROMEWEBSTORE.md). Merging a version bump to `main` tags a [GitHub release](https://github.com/im-adamlambourne/Wordpress-Vampire-Chrome-extension/releases) with the store ZIP.
 
-Files: `background/pkce.js`, `background/plugin-auth.js`, `background/plugin-chat.js`, `background/plugin-echo.js`, `offscreen/offscreen.html`, `popup/popup.html`, `content/chat-modal.js`, `content/editor-bridge.js`, `assets/robot.png`, `assets/chat-notification.mp3`. After changing `offscreen/src/echo-client.js`, run `npm run build:echo` and keep `offscreen/echo-client.js` in the repo.
+### Load unpacked (development)
 
-The WebSocket host is **only** `broadcasting` from the token response (stored in `chrome.storage.local`). Laravel endpoints and how that host is derived: `content-exchange-v2/core/docs/Content-Studio-Plugin-Auth.md`.
+1. Open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → this repository root.
+2. After code changes, reload the extension, then reload the WordPress tab so the overlay reinjects.
 
-## Chrome Web Store (private)
+The overlay only injects on Immediate Media WCP `/wp-admin/` and `http://localhost` / `http://127.0.0.1`.
 
-Staff install is a **Private** Chrome Web Store listing (not public search). Unlisted is the wrong setting: anyone with the URL could install it.
+## Sign in
 
-Full dashboard copy, permission justifications, privacy disclosures, and the upload steps are in `CHROMEWEBSTORE.md`. Package with `./scripts/package-cws.sh` (writes `dist/content-studio-plugin-v0.9.0.zip`), or download that ZIP from the matching [GitHub release](https://github.com/im-adamlambourne/Wordpress-Vampire-Chrome-extension/releases) — bumping `manifest.json` and merging to `main` tags and builds one automatically (see `AGENTS.md`). The privacy policy is `https://content-studio.im/plugin/privacy` and `https://develop.content-studio.im/plugin/privacy` (`GET /plugin/privacy` on Content Studio; copy in `docs/privacy-policy.html`). It must load without signing in.
+The toolbar popup is the sign-in screen. You can also use **Sign in** on the assistant overlay when an editor is already open.
 
-After the store assigns an item ID, add `https://<item-id>.chromiumapp.org/` to the Content Studio OAuth client. Unpacked-dev and store builds use different extension IDs.
+1. Open a WordPress editor tab, then open the popup and click **Log in**.
+2. Allow access when Chrome asks (Content Studio and the matching realtime host).
+3. Sign in to Content Studio and **Connect**. Local Sail: `admin@immediate.co.uk` / `password123`.
+4. A notification confirms login, and the popup reopens with **Successfully logged in as {name}**.
 
-## Permissions
+The server follows the WordPress site you are on unless you have saved an override:
 
-- `tabs` — read the active tab URL (WordPress attach, and to pick the matching Workspace site)
-- `storage` — host, optional host override flag, token, signed-in display name (for the chat avatar), user id, and public Echo settings
-- `identity` — OAuth bounce
-- `notifications` — confirm login after the identity window closes (popup is already gone)
-- `offscreen` — keep a WebSocket open so chat replies can arrive after the service worker sleeps
-- `content_scripts.matches` Immediate Media WCP admin (`https://*.production.wcp.imdserve.com/wp-admin/*`, `https://*.release.wcp.imdserve.com/wp-admin/*`) plus local loopback — WordPress admin attach. Do not put a `*://*/wp-admin/*` pattern in `host_permissions`: Chrome ignores the path there and treats it as all http(s) sites.
-- `optional_host_permissions` Content Studio and realtime origins (`https://content-studio.im/*`, `https://develop.content-studio.im/*`, `https://ws.content-studio.im/*`, `https://ws.develop.content-studio.im/*`, and localhost including ports 8080 and 8081) — requested at runtime on **Log in** or **Save host** for the configured Laravel origin and the guessed Reverb origin (`localhost:8081` or `ws.{hostname}`), which must match `broadcasting` from the token
-- `web_accessible_resources` — robot avatar, chat notification sound, and IM header logo on the same WCP and loopback hosts (Chrome only allows a `/*` path here)
+| WordPress | Content Studio |
+| --- | --- |
+| `*.release.wcp.imdserve.com` | [develop.content-studio.im](https://develop.content-studio.im) |
+| `*.production.wcp.imdserve.com` | [content-studio.im](https://content-studio.im) |
+| Local loopback | Develop, unless you choose **Local** in Settings |
 
-## Out of scope until asked
+**Settings** (cog) → **Show advanced settings** is where you change server and inspect the WordPress session dump. Saving a host that does not match the current tab sets an override; saving the matching origin clears it. Changing host signs you out.
 
-Save/publish, taxonomies, featured image, Open Graph image, custom meta (other than SEO/Open Graph text fields, focus keyphrase, and matching ACF text fields for those plus excerpt/standfirst), WordPress.com.
+If the overlay’s **Sign in** cannot request host access, it opens the toolbar popup so **Log in** can.
+
+## Using the assistant
+
+1. Open a `post`, `sxs-recipe`, or `list` in Gutenberg or Classic on WCP (or local WordPress).
+2. Sign in if the shell is collapsed to **Sign in**.
+3. Choose an action. The assistant thinks, then shows a reply and suggestion cards.
+4. Accept the cards you want. Save in WordPress yourself.
+
+House style is taken from the Content Studio site that matches the WordPress host, or from your only assigned site when you are on local WordPress.
+
+## Local Content Studio
+
+To point the plugin at a Sail app instead of Develop:
+
+1. Start Reverb (`docker compose exec laravel.test php artisan reverb:start`, host port **8081**) and a `plugin` worker (`horizon`, or `queue:work --queue=plugin`).
+2. In the popup: **Settings** → **Show advanced settings** → Server **Local (localhost)** → **Save host**. Allow `http://localhost` and `http://localhost:8081` when Chrome asks.
+3. Sign in from the popup or the overlay.
+
+Laravel auth and realtime endpoints are documented in `content-exchange-v2` (`core/docs/Content-Studio-Plugin-Auth.md`). The chat request/reply contract is [`docs/plugin-chat-api.md`](docs/plugin-chat-api.md). With `QUEUE_CONNECTION=sync`, chat waits on the model instead of returning 202 immediately.
+
+## Documentation
+
+| Doc | What it covers |
+| --- | --- |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+| [`AGENTS.md`](AGENTS.md) | Architecture and contributor notes |
+| [`docs/plugin-chat-api.md`](docs/plugin-chat-api.md) | Chat API contract with Content Studio |
+| [`CHROMEWEBSTORE.md`](CHROMEWEBSTORE.md) | Private store listing, permissions, packaging |
+| [`docs/privacy-policy.html`](docs/privacy-policy.html) | Privacy policy copy (live at `/plugin/privacy` on Content Studio) |
+
+After changing `offscreen/src/echo-client.js`, run `npm run build:echo` and commit `offscreen/echo-client.js`.
+
+## Privacy
+
+The plugin stores the server address, an optional host override, sign-in token, display name, user id, and public realtime settings on this computer. Draft snapshots and chat are sent only to that Content Studio server, and only when you run an action. There is no advertising or analytics SDK. Log out to clear the token and name.
+
+Live policy: [content-studio.im/plugin/privacy](https://content-studio.im/plugin/privacy) and [develop.content-studio.im/plugin/privacy](https://develop.content-studio.im/plugin/privacy).
+
+## Out of scope
+
+Save/publish, taxonomies, featured image, Open Graph image, custom meta beyond SEO/Open Graph text, focus keyphrase, matching ACF text fields, recipe Method Steps, and list-item editorial comments. WordPress.com is not supported.

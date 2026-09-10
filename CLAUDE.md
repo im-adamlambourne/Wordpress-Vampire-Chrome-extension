@@ -1,6 +1,11 @@
-# Content Studio Chrome extension
+# Content Studio Chrome Plugin
 
-Read and follow [`AGENTS.md`](AGENTS.md). Treat `.agents/skills/` as required plugins (Chrome Extensions and Modern Web Guidance) before changing code.
+Codename **Vampire**. Read and follow [`AGENTS.md`](AGENTS.md). Treat `.agents/skills/` as required plugins (Chrome Extensions and Modern Web Guidance) before changing code.
+
+## Documentation
+
+- [`README.md`](README.md) is the high-level product overview for humans (what it does, supported editors, sign-in, local setup). Keep it accurate when behaviour, hosts, post types, or login change.
+- [`AGENTS.md`](AGENTS.md) is architecture and contributor notes. Keep it in step with the README for product name, supported surfaces, and where login and other docs live.
 
 ## Changelog (required)
 

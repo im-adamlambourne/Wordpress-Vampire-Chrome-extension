@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- [`README.md`](README.md) is a high-level overview of **Content Studio Chrome Plugin** (codename Vampire): what it does, who it is for, sign-in, and where the detailed docs live. Architecture, file maps, and permission justifications stay in [`AGENTS.md`](AGENTS.md) and [`CHROMEWEBSTORE.md`](CHROMEWEBSTORE.md). [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md) use the same product name and keep that doc split.
 - The plugin picks a Content Studio host from the WordPress tab unless you override it in Settings: `*.release.wcp.imdserve.com` uses Develop, `*.production.wcp.imdserve.com` uses Production, and loopback still uses Develop. Saving or logging in with a different Server host remembers that choice until you save again. Saving the host that matches this WordPress tab turns auto-matching back on.
 - The assistant overlay only mounts on `post`, `sxs-recipe`, and `list` editors. Pages and other post types still attach for session debug, but the chat shell stays off.
 
